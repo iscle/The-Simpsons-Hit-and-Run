@@ -10,8 +10,6 @@ This port uses the PC assets, so you will need to have the PC version of the gam
 
 Make a copy of your installation folder from the official PC release and then extract [the release zip file](https://github.com/ZenoArrows/The-Simpsons-Hit-and-Run/releases) into that folder replacing any existing files.
 
-To add support for cutscenes you will need to acquire a copy of a [Bink 2 encoder](https://github.com/marcussacana/Bink2), place the executable in the movies folder and then run `convert.bat` to convert the Bink 1 cutscenes to Bink 2. After running the conversion the converted movies are in the `.rmv` files, while the original movies are backed up as `.bik` files.
-
 Finally copy the folder to the switch folder on your sd card and launch the game from the hbmenu. Do not run the hbmenu in applet mode or the game will run out of memory on bootup and crash.
 
 # Multi-Language support
