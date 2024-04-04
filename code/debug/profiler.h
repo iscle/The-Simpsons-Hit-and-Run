@@ -16,7 +16,7 @@
 // Nested Includes
 //========================================
 
-#if !defined( RAD_RELEASE ) && !defined( WORLD_BUILDER ) && !defined( RAD_MW )
+#if !defined( RAD_RELEASE ) && !defined( WORLD_BUILDER ) && !defined( RAD_MW ) && !defined( __ANDROID__ )
 #define PROFILER_ENABLED
 #define MICROPROFILE_ENABLED 1
 #endif // RAD_RELEASE
