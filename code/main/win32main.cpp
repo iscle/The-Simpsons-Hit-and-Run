@@ -41,6 +41,9 @@ unsigned int sceLibcHeapSize = 16 * 1024 * 1024;
 #include <memory/memoryutilities.h>
 #include <memory/srrmemory.h>
 #include <p3d/entity.hpp>
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 
 //========================================
 // Forward Declarations
@@ -51,8 +54,34 @@ static void ProcessCommandLineArgumentsFromFile();
 
 static void LogOutputFunction( void *userdata, int category, SDL_LogPriority priority, const char *message )
 {
-#ifdef RAD_VITA
+#if defined(RAD_VITA)
     sceClibPrintf( "%s\n", message );
+#elif defined(__ANDROID__)
+    int prio;
+    switch (priority) {
+        case SDL_LOG_PRIORITY_VERBOSE:
+            prio = ANDROID_LOG_VERBOSE;
+            break;
+        case SDL_LOG_PRIORITY_DEBUG:
+            prio = ANDROID_LOG_DEBUG;
+            break;
+        case SDL_LOG_PRIORITY_INFO:
+            prio = ANDROID_LOG_INFO;
+            break;
+        case SDL_LOG_PRIORITY_WARN:
+            prio = ANDROID_LOG_WARN;
+            break;
+        case SDL_LOG_PRIORITY_ERROR:
+            prio = ANDROID_LOG_ERROR;
+            break;
+        case SDL_LOG_PRIORITY_CRITICAL:
+            prio = ANDROID_LOG_FATAL;
+            break;
+        default:
+            prio = ANDROID_LOG_INFO;
+            break;
+    }
+    __android_log_write(prio, "SRR2_native", message);
 #else
     printf( "%s\n", message );
     fflush( stdout );
