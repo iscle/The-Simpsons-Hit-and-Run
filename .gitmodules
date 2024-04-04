@@ -1,3 +1,9 @@
 [submodule "android/app/src/main/cpp/sdl"]
 	path = android/app/src/main/cpp/sdl
 	url = https://github.com/libsdl-org/SDL.git
+[submodule "android/app/src/main/cpp/libpng"]
+	path = android/app/src/main/cpp/libpng
+	url = https://github.com/pnggroup/libpng.git
+[submodule "android/app/src/main/cpp/openal-soft"]
+	path = android/app/src/main/cpp/openal-soft
+	url = https://github.com/kcat/openal-soft.git
