@@ -280,8 +280,9 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
 
     // Load the .so
     public void loadLibraries() {
-       for (String lib : getLibraries()) {
-          SDL.loadLibrary(lib);
+       String[] libraries = getLibraries();
+       for (int i = 0; i < libraries.length - 1; i++) {
+          SDL.loadLibrary(libraries[i]);
        }
     }
 
