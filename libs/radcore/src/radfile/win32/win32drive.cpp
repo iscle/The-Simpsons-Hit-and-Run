@@ -180,56 +180,41 @@ radDrive::CompletionStatus radWin32Drive::OpenFile
     unsigned int*       pSize 
 )
 {
-    std::error_code error;
-    std::string tmp(fileName);
-    std::replace(tmp.begin(), tmp.end(), '\\', '/');
-    std::filesystem::path path(tmp);
-    path.make_preferred();
-    if (std::filesystem::exists(path, error))
-    {
-        if (!error)
-            *pSize = std::filesystem::file_size(path, error);
-        if (error)
-        {
-            m_LastError = TranslateError(error);
-            return Error;
-        }
-    }
-    else
-    {
-        *pSize = 0;
-        if (flags == OpenExisting)
-        {
-            m_LastError = FileNotFound;
-            return Error;
+    char fixedFileName[PATH_MAX];
+    size_t fileNameLength = strlen(fileName);
+
+    memcpy(fixedFileName, fileName, fileNameLength + 1);
+    for (size_t i = 0; i < fileNameLength; i++) {
+        if (fixedFileName[i] == '\\') {
+            fixedFileName[i] = '/';
         }
     }
 
-    //
-    // Translate flags to stl
-    //
-    std::ios_base::openmode mode = std::ios::binary | std::ios::in;
-    if (writeAccess)
-        mode |= std::ios::out;
-    if (flags == CreateAlways)
-        mode |= std::ios::trunc;
-
-    //
-    // Right now using buffered reads, change it later for performance.
-    //
-    *pHandle = new std::fstream(path, mode);
-
-    if ( (*pHandle)->good() )
-    {
-        m_OpenFiles++;
-        m_LastError = Success;
-        return Complete;
+    // FIXME: Actually make use of the flags :)
+    switch (flags) {
+        case OpenExisting:
+            rReleasePrintf("Opening file %s (writeAccess: %d, flags: OpenExisting)\n", fixedFileName, writeAccess);
+            break;
+        case OpenAlways:
+            rReleasePrintf("Opening file %s (writeAccess: %d, flags: OpenAlways)\n", fixedFileName, writeAccess);
+            break;
+        case CreateAlways:
+            rReleasePrintf("Opening file %s (writeAccess: %d, flags: CreateAlways)\n", fixedFileName, writeAccess);
+            break;
     }
-    else
+
+    *pHandle = SDL_RWFromFile(fixedFileName, writeAccess ? "rb+" : "rb");
+    if (*pHandle == NULL)
     {
         m_LastError = FileNotFound;
         return Error;
     }
+
+    *pSize = SDL_RWsize(*pHandle);
+
+    m_OpenFiles++;
+    m_LastError = Success;
+    return Complete;
 }
 
 //=============================================================================
@@ -238,7 +223,7 @@ radDrive::CompletionStatus radWin32Drive::OpenFile
 
 radDrive::CompletionStatus radWin32Drive::CloseFile( radFileHandle handle, const char* fileName )
 {
-    delete handle;
+    SDL_RWclose(handle);
     m_OpenFiles--;
     return Complete;
 }
@@ -265,19 +250,8 @@ radDrive::CompletionStatus radWin32Drive::ReadFile
     //
     // set file pointer
     //
-    handle->seekg(position);
-    if (handle->good())
-    {
-        handle->read((char*)pData, bytesToRead);
-        if (!handle->bad())
-        {
-            //
-            // Successful read!
-            //
-            
-            //
-            // Change this during buffered read!!
-            //
+    if (SDL_RWseek(handle, position, RW_SEEK_SET) != -1) {
+        if (SDL_RWread(handle, pData, 1, bytesToRead) == bytesToRead) {
             *bytesRead = bytesToRead;
             m_LastError = Success;
             return Complete;
@@ -320,18 +294,10 @@ radDrive::CompletionStatus radWin32Drive::WriteFile
     //
     // do the write
     //
-    handle->seekp(position);
-    if (handle->good())
-    {
-        handle->write((char*)pData, bytesToWrite);
-        if (!handle->bad())
-        {
-            //
-            // Sucessful write
-            //
-            handle->seekp(0, std::ios_base::end);
+    if (SDL_RWseek(handle, position, RW_SEEK_SET) != -1) {
+        if (SDL_RWwrite(handle, pData, 1, bytesToWrite) == bytesToWrite) {
             *bytesWritten = bytesToWrite;
-            *pSize = handle->tellp();
+            *pSize = SDL_RWsize(handle);
             m_LastError = Success;
             return Complete;
         }
