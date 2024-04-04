@@ -75,8 +75,8 @@ const unsigned int radMovie_NoAudioTrack = 0xFFFFFFFF;
 // Static Members
 //=============================================================================
 
-radMoviePlayer * radLinkedClass< radMoviePlayer >::s_pLinkedClassHead = NULL;
-radMoviePlayer * radLinkedClass< radMoviePlayer >::s_pLinkedClassTail = NULL;
+template<> radMoviePlayer * radLinkedClass< radMoviePlayer >::s_pLinkedClassHead = NULL;
+template<> radMoviePlayer * radLinkedClass< radMoviePlayer >::s_pLinkedClassTail = NULL;
 
 //=============================================================================
 // Public Member Functions

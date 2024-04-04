@@ -6443,7 +6443,7 @@ public radRefCount
     virtual void GetStatus( unsigned int* totalFreeMemory, unsigned int* largestBlock,
 		unsigned int* numberOfObjects, unsigned int * highWaterMark )
 	{
-		mallinfo myInfo = mspace_mallinfo( m_MallocState );
+		struct mallinfo myInfo = mspace_mallinfo( m_MallocState );
         unsigned int totalFree = m_SizeOfMemory - myInfo.uordblks; 
         unsigned int totalUsed = myInfo.uordblks;
         if( totalUsed > m_HighWaterMark )

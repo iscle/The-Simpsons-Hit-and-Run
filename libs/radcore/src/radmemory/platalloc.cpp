@@ -137,7 +137,12 @@ void radMemoryPlatFree( void * pMemory )
 
 void * radMemoryPlatAllocAligned( unsigned int numberOfBytes, unsigned int alignment )
 {
-	#ifndef WIN32
+#ifdef __ANDROID__
+    void *pMemory;
+    int ret = posix_memalign( &pMemory, alignment, numberOfBytes );
+    return ret ? NULL : pMemory;
+#else
+    #ifndef WIN32
 
 		return ::aligned_alloc( alignment, numberOfBytes );
 
@@ -145,7 +150,8 @@ void * radMemoryPlatAllocAligned( unsigned int numberOfBytes, unsigned int align
 
         return _aligned_malloc( numberOfBytes, alignment );
 
-	#endif
+    #endif
+#endif
 }
 
 //============================================================================
