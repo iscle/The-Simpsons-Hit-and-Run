@@ -206,6 +206,7 @@ radDrive::CompletionStatus radWin32Drive::OpenFile
     *pHandle = SDL_RWFromFile(fixedFileName, writeAccess ? "rb+" : "rb");
     if (*pHandle == NULL)
     {
+        rReleasePrintf("Failed to open file %s\n", fixedFileName);
         m_LastError = FileNotFound;
         return Error;
     }
@@ -322,6 +323,7 @@ radDrive::CompletionStatus radWin32Drive::FindFirst
     bool                        firstSearch
 )
 {
+    rAssertMsg(false, "radWin32Drive::FindFirst not implemented");
     //
     // Find first
     //
@@ -351,6 +353,7 @@ radDrive::CompletionStatus radWin32Drive::FindFirst
 
 radDrive::CompletionStatus radWin32Drive::FindNext( radFileDirHandle* pHandle, IRadDrive::DirectoryInfo* pDirectoryInfo )
 {
+    rAssertMsg(false, "radWin32Drive::FindNext not implemented");
     //
     // If we don't have a handle, return file not found.
     //
@@ -385,6 +388,7 @@ radDrive::CompletionStatus radWin32Drive::FindNext( radFileDirHandle* pHandle, I
 
 radDrive::CompletionStatus radWin32Drive::FindClose( radFileDirHandle* pHandle )
 {
+    rAssertMsg(false, "radWin32Drive::FindClose not implemented");
     *pHandle = std::filesystem::directory_iterator();
 
     return Complete;
@@ -396,6 +400,7 @@ radDrive::CompletionStatus radWin32Drive::FindClose( radFileDirHandle* pHandle )
 
 radDrive::CompletionStatus radWin32Drive::CreateDir( const char* pName )
 {
+    rAssertMsg(false, "radWin32Drive::CreateDir not implemented");
     rWarningMsg( m_Capabilities & radDriveDirectory, 
         "This drive does not support the CreateDir function." );
 
@@ -418,6 +423,8 @@ radDrive::CompletionStatus radWin32Drive::CreateDir( const char* pName )
 
 radDrive::CompletionStatus radWin32Drive::DestroyDir( const char* pName )
 {
+    rAssertMsg(false, "radWin32Drive::DestroyDir not implemented");
+
     rWarningMsg( m_Capabilities & radDriveDirectory,
         "This drive does not support the DestroyDir function." );
 
@@ -442,6 +449,8 @@ radDrive::CompletionStatus radWin32Drive::DestroyDir( const char* pName )
 
 radDrive::CompletionStatus radWin32Drive::DestroyFile( const char* filename )
 {
+    rAssertMsg(false, "radWin32Drive::DestroyFile not implemented");
+
     rWarningMsg( m_Capabilities & radDriveWriteable, "This drive does not support the DestroyFile function." );
 
     //

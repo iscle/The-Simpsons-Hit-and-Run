@@ -56,7 +56,7 @@ radThread* radThread::s_ThreadTable[ MAX_RADTHREADS ];
 //
 SDL_ThreadPriority radThread::s_PriorityMap[ PriorityHigh + 1 ] =
         { SDL_THREAD_PRIORITY_LOW, SDL_THREAD_PRIORITY_LOW, SDL_THREAD_PRIORITY_NORMAL,
-          SDL_THREAD_PRIORITY_HIGH, SDL_THREAD_PRIORITY_HIGH };
+          SDL_THREAD_PRIORITY_HIGH, SDL_THREAD_PRIORITY_TIME_CRITICAL };
 
 //
 // This static is used to manage free thread local storgage objects. The
@@ -728,7 +728,7 @@ int radThread::InternalThreadEntry( void* param )
     //
     pThread->m_IsRunning = false;
 
-    return 0;
+    return pThread->m_ReturnCode;
 }
 
 //=============================================================================

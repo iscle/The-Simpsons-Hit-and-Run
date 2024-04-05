@@ -21,8 +21,18 @@ if(CCACHE_FOUND)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
 endif()
 
-find_package(SDL2 REQUIRED)
-find_package(PNG REQUIRED)
+if(ANDROID)
+	add_subdirectory(android/app/src/main/cpp/sdl)
+	set(PNG_SHARED OFF)
+	set(PNG_TESTS OFF)
+	add_subdirectory(android/app/src/main/cpp/libpng)
+	set(PNG_SHARED OFF)
+	set(PNG_TESTS OFF)
+else()
+	find_package(SDL2 REQUIRED)
+	find_package(PNG REQUIRED)
+endif()
+
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
@@ -30,7 +40,11 @@ set(SRR2_OPENAL_IMPL "OpenAL-Soft" CACHE STRING "OpenAL implementation")
 set_property(CACHE SRR2_OPENAL_IMPL PROPERTY STRINGS "OpenAL-Soft" "MojoAL")
 
 if (SRR2_OPENAL_IMPL STREQUAL "OpenAL-Soft")
-	find_package(OpenAL REQUIRED)
+	if(ANDROID)
+		add_subdirectory(android/app/src/main/cpp/openal-soft)
+	else()
+		find_package(OpenAL REQUIRED)
+	endif ()
 	set(SRR2_OPENAL_TARGET OpenAL::OpenAL)
 else()
 	add_subdirectory(libs/sdks/mojoal SYSTEM)
@@ -73,20 +87,22 @@ if(SRR2_REROUTE_ALL_HEAP_ALLOCATIONS)
 	add_compile_definitions(REROUTE_ALL_HEAP_ALLOCATIONS)
 endif()
 
-option(SRR2_USE_BINK OFF)
-if(SRR2_USE_BINK)
-	add_compile_definitions(RAD_MOVIEPLAYER_USE_BINK)
+if(ANDROID)
+	# TODO: Add ffmpeg
 else()
-	find_package(PkgConfig REQUIRED)
-	pkg_check_modules(FFmpeg REQUIRED IMPORTED_TARGET
-			libavformat
-			libavcodec
-			libswresample
-			libswscale
-	)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(FFmpeg REQUIRED IMPORTED_TARGET
+		libavformat
+		libavcodec
+		libswresample
+		libswscale
+)
 endif()
 
 option(SRR2_USE_GLES OFF)
+if(ANDROID)
+	set(SRR2_USE_GLES ON)
+endif()
 if(SRR2_USE_GLES)
 	add_compile_definitions(RAD_GLES)
 endif()
@@ -887,20 +903,11 @@ set(RADMATH_SOURCES
 	"libs/radmath/radmath/vector.cpp"
 )
 
-if(SRR2_USE_BINK)
-	set(RADMOVIE_SOURCES
-		"libs/radmovie/src/common/binkmovieplayer.cpp"
-		"libs/radmovie/src/common/binkradfile.cpp"
-		"libs/radmovie/src/common/binkrenderstrategy.cpp"
-		"libs/radmovie/src/pch/pch.cpp"
-	)
-else()
-	set(RADMOVIE_SOURCES
+set(RADMOVIE_SOURCES
 		"libs/radmovie/src/common/ffmpegmovieplayer.cpp"
 		"libs/radmovie/src/common/binkrenderstrategy.cpp"
 		"libs/radmovie/src/pch/pch.cpp"
-	)
-endif()
+)
 
 set(RADMUSIC_SOURCES
 	"libs/radmusic/src/memory/memory.cpp"
@@ -1055,58 +1062,6 @@ set(SIM_SOURCES
 	"libs/sim/simphysics/virtualcm.cpp"
 )
 
-if(SRR2_USE_BINK)
-	set(BINK_SOURCES
-		"libs/sdks/bink/binkacd.cpp"
-		"libs/sdks/bink/binkasyncRR.c"
-		"libs/sdks/bink/binkasyncthread.c"
-		"libs/sdks/bink/binkcomm.c"
-		"libs/sdks/bink/binkfile.c"
-		"libs/sdks/bink/binkmarkers.c"
-		"libs/sdks/bink/binkread.c"
-		"libs/sdks/bink/binkoal.c"
-		"libs/sdks/bink/binkssmix.c"
-		"libs/sdks/bink/binkutil.c"
-		"libs/sdks/bink/blitter.c" # custom
-		"libs/sdks/bink/expand2.c"
-		"libs/sdks/bink/popmal.c"
-		"libs/sdks/bink/radfft.cpp"
-	)
-
-	if (CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
-		list(APPEND BINK_SOURCES "libs/sdks/bink/x86_cpu.c")
-	endif ()
-
-	if (WIN32)
-		list(APPEND BINK_SOURCES
-			"libs/sdks/bink/binkplugin.c"
-			"libs/sdks/bink/binkpluginw32.c"
-			"libs/sdks/bink/binkxa2.cpp"
-			"libs/sdks/bink/win32_radmem.c"
-			"libs/sdks/bink/win32_rrAtomics.cpp"
-			"libs/sdks/bink/win32_rrCpu.c"
-			"libs/sdks/bink/win32_rrThreads2.c"
-			"libs/sdks/bink/wintimer.c"
-		)
-		#if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86_64)
-		#	list(APPEND BINK_SOURCES "libs/sdks/bink/win64_rrAtomics_x64.asm")
-		#endif()
-	else()
-		list(APPEND BINK_SOURCES
-			"libs/sdks/bink/binklnx.c"
-			#"libs/sdks/bink/binkpa.c"
-			#"libs/sdks/bink/binkplugin.c"
-			#"libs/sdks/bink/binkpluginlnx.c"
-			"libs/sdks/bink/binkssmix.c"
-			"libs/sdks/bink/posix_defread.c"
-			"libs/sdks/bink/posix_radmem.c"
-			"libs/sdks/bink/posix_rrCpu.c"
-			"libs/sdks/bink/posix_rrThreads2.c"
-			"libs/sdks/bink/cpp_rratomics.cpp"
-		)
-	endif()
-endif()
-
 set(PDDI_SOURCES
 	"libs/pure3d/pddi/base/basecontext.cpp"
 	"libs/pure3d/pddi/base/baseshader.cpp"
@@ -1183,14 +1138,24 @@ target_include_directories(p3d
 	PUBLIC "libs/pure3d/"
 	#PRIVATE "code/" # wtf
 	PRIVATE "libs/" # wtf
+	PRIVATE "android/app/src/main/cpp/libpng"
+	PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/android/app/src/main/cpp/libpng
 )
 target_link_libraries(p3d
-	PNG::PNG
 	pddi
 	radcore
 	radcontent
 	radmath
 )
+if(ANDROID)
+	target_link_libraries(p3d
+			png_static
+	)
+else()
+	target_link_libraries(p3d
+		PNG::PNG
+	)
+endif()
 
 add_library(choreo STATIC ${CHOREO_SOURCES})
 target_include_directories(choreo
@@ -1228,8 +1193,8 @@ target_link_libraries(radmovie
 	radcore
 	radsound
 )
-if(SRR2_USE_BINK)
-	target_link_libraries(radmovie bink)
+if(ANDROID)
+	# TODO: Add ffmpeg
 else()
 	target_link_libraries(radmovie PkgConfig::FFmpeg)
 endif()
@@ -1243,8 +1208,14 @@ if(SRR2_BUILD_TESTS)
 		pddi
 		radcore
 		radsound
-		PkgConfig::FFmpeg
 	)
+	if(ANDROID)
+		# TODO: Add ffmpeg
+	else()
+		target_link_libraries(simplemovie
+				PkgConfig::FFmpeg
+		)
+	endif()
 	if(VITA)
 		target_link_libraries(simplemovie
 			SceLibKernel_stub
@@ -1335,33 +1306,11 @@ target_link_libraries(sim
 	poser
 )
 
-if(SRR2_USE_BINK)
-	add_library(bink STATIC ${BINK_SOURCES})
-	target_compile_definitions(bink
-		PRIVATE
-			USING_EGT
-			INC_BINK2
-			NO_BINK20
-			NO_BINK10_SUPPORT
-		PUBLIC
-			__RADFINAL__
-			__RADINSTATICLIB__
-	)
-	target_link_libraries(bink ${SRR2_OPENAL_TARGET})
-	if (WIN32)
-		target_link_libraries(bink Winmm)
-	endif()
-	if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-		target_compile_options(bink
-			PRIVATE -Wno-multichar
-		)
-	endif()
-	target_include_directories(bink
-		PUBLIC "libs/sdks/bink/"
-	)
+if(ANDROID)
+	add_library(SRR2 SHARED ${SRR2_SOURCES})
+else()
+	add_executable(SRR2 ${SRR2_SOURCES})
 endif()
-
-add_executable(SRR2 ${SRR2_SOURCES})
 target_link_libraries(SRR2
 	SDL2::SDL2
 	SDL2::SDL2main
@@ -1380,6 +1329,11 @@ target_link_libraries(SRR2
 	sim
 	Threads::Threads
 )
+if(ANDROID)
+	target_link_libraries(SRR2
+			log
+	)
+endif()
 if(WIN32)
 	# needed for microprofile
 	target_link_libraries(SRR2 wsock32)
@@ -1403,10 +1357,12 @@ if(VITA)
 		target_link_libraries(SRR2 vitaGL vitashark)
 	endif()
 endif()
-if(SRR2_USE_BINK)
-	target_link_libraries(SRR2 bink)
+if(ANDROID)
+	# TODO: Add ffmpeg
 else()
-	target_link_libraries(SRR2 PkgConfig::FFmpeg)
+	target_link_libraries(SRR2
+			PkgConfig::FFmpeg
+	)
 endif()
 target_compile_features(SRR2 PRIVATE cxx_std_17)
 

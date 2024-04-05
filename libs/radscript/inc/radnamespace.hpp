@@ -268,47 +268,48 @@ public:
 
     void MoveToFront( void )
     {
-        if( GetLinkedClassHead() != this )
-        {
-            //
-            // Remove from list
-            //
-			if ( m_pLinkedClassPrev != NULL )
-			{
-				m_pLinkedClassPrev->m_pLinkedClassNext = m_pLinkedClassNext;
-			}
-			else
-			{
-				s_pLinkedClassHead = m_pLinkedClassNext;
-			}
-
-			if ( m_pLinkedClassNext != NULL )
-			{
-				m_pLinkedClassNext->m_pLinkedClassPrev = m_pLinkedClassPrev;
-			}
-            else
-            {
-                s_pLinkedClassTail = m_pLinkedClassPrev;
-            }
-
-            //
-            // Re-add in front
-            //
-            m_pLinkedClassPrev = NULL;
-
-            if ( s_pLinkedClassHead != NULL )
-            {
-                s_pLinkedClassHead->m_pLinkedClassPrev = static_cast< IRadNameSpace * >( this );
-                m_pLinkedClassNext = s_pLinkedClassHead;
-            }
-            else
-            {
-                s_pLinkedClassTail = static_cast< IRadNameSpace * >( this );
-                m_pLinkedClassNext = NULL;
-            }
-
-            s_pLinkedClassHead = static_cast< IRadNameSpace * >( this );
-        }
+        rReleasePrintf("MoveToFront not implemented");
+//        if( GetLinkedClassHead() != this )
+//        {
+//            //
+//            // Remove from list
+//            //
+//			if ( m_pLinkedClassPrev != NULL )
+//			{
+//				m_pLinkedClassPrev->m_pLinkedClassNext = m_pLinkedClassNext;
+//			}
+//			else
+//			{
+//				s_pLinkedClassHead = m_pLinkedClassNext;
+//			}
+//
+//			if ( m_pLinkedClassNext != NULL )
+//			{
+//				m_pLinkedClassNext->m_pLinkedClassPrev = m_pLinkedClassPrev;
+//			}
+//            else
+//            {
+//                s_pLinkedClassTail = m_pLinkedClassPrev;
+//            }
+//
+//            //
+//            // Re-add in front
+//            //
+//            m_pLinkedClassPrev = NULL;
+//
+//            if ( s_pLinkedClassHead != NULL )
+//            {
+//                s_pLinkedClassHead->m_pLinkedClassPrev = static_cast< IRadNameSpace * >( this );
+//                m_pLinkedClassNext = s_pLinkedClassHead;
+//            }
+//            else
+//            {
+//                s_pLinkedClassTail = static_cast< IRadNameSpace * >( this );
+//                m_pLinkedClassNext = NULL;
+//            }
+//
+//            s_pLinkedClassHead = static_cast< IRadNameSpace * >( this );
+//        }
     }
 
     //====================================================================

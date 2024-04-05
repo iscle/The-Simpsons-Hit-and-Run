@@ -120,7 +120,7 @@ extern "C" int main( int argc, char *argv[] )
     // Initialize SDL subsystems
     //
     SDL_Init( SDL_INIT_EVENTS | SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER );
-	
+    SDL_LogSetAllPriority(SDL_LOG_PRIORITY_VERBOSE);
     SDL_LogSetOutputFunction( LogOutputFunction, NULL );
 
     //

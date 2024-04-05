@@ -40,12 +40,12 @@
 //=============================================================================
 
 class radMoviePlayer;
-struct AVFormatContext;
-struct AVCodecContext;
-struct SwsContext;
-struct SwrContext;
-struct AVFrame;
-struct AVPacket;
+//struct AVFormatContext;
+//struct AVCodecContext;
+//struct SwsContext;
+//struct SwrContext;
+//struct AVFrame;
+//struct AVPacket;
 
 //=============================================================================
 // Type Definitions
@@ -122,15 +122,15 @@ class radMoviePlayer
         unsigned int m_PresentationTime;
         unsigned int m_PresentationDuration;
 
-        AVFormatContext* m_pFormatCtx;
-        AVCodecContext * m_pVideoCtx;
-        AVCodecContext * m_pAudioCtx;
-        SwsContext * m_pSwsCtx;
-        SwrContext * m_pSwrCtx;
-
-        AVPacket* m_pPacket;
-        AVFrame * m_pVideoFrame;
-        AVFrame * m_pAudioFrame;
+//        AVFormatContext* m_pFormatCtx;
+//        AVCodecContext * m_pVideoCtx;
+//        AVCodecContext * m_pAudioCtx;
+//        SwsContext * m_pSwsCtx;
+//        SwrContext * m_pSwrCtx;
+//
+//        AVPacket* m_pPacket;
+//        AVFrame * m_pVideoFrame;
+//        AVFrame * m_pAudioFrame;
 
         ALuint m_AudioSource;
 };
