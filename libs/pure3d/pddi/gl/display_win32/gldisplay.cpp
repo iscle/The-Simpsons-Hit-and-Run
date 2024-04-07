@@ -220,7 +220,7 @@ bool pglDisplay ::InitDisplay(const pddiDisplayInit* init)
 
     SDL_Log("OpenGL - Vendor: %s, Renderer: %s, Version: %s",glVendor,glRenderer,glVersion);
 
-#if defined RAD_DEBUG && !defined RAD_VITA
+#if defined RAD_DEBUG && !defined RAD_VITA && !defined __ANDROID__
     glEnable(GL_DEBUG_OUTPUT_KHR);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_KHR);
     glDebugMessageCallback(MessageCallback, NULL);

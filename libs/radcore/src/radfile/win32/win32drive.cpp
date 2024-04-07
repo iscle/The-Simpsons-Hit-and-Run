@@ -206,12 +206,13 @@ radDrive::CompletionStatus radWin32Drive::OpenFile
     *pHandle = SDL_RWFromFile(fixedFileName, writeAccess ? "rb+" : "rb");
     if (*pHandle == NULL)
     {
-        rReleasePrintf("Failed to open file %s\n", fixedFileName);
+        rReleasePrintf("Failed to open file %s: %s\n", fixedFileName, SDL_GetError());
         m_LastError = FileNotFound;
         return Error;
     }
 
     *pSize = SDL_RWsize(*pHandle);
+    rReleasePrintf("Opened file %s with size %d\n", fixedFileName, *pSize);
 
     m_OpenFiles++;
     m_LastError = Success;
@@ -224,6 +225,7 @@ radDrive::CompletionStatus radWin32Drive::OpenFile
 
 radDrive::CompletionStatus radWin32Drive::CloseFile( radFileHandle handle, const char* fileName )
 {
+    rReleasePrintf("Closing file %s\n", fileName);
     SDL_RWclose(handle);
     m_OpenFiles--;
     return Complete;
@@ -248,22 +250,25 @@ radDrive::CompletionStatus radWin32Drive::ReadFile
     rAssertMsg( pDataSpace == radMemorySpace_Local, 
                 "radFileSystem: radWin32Drive: External memory not supported for reads." );
 
-    //
-    // set file pointer
-    //
-    if (SDL_RWseek(handle, position, RW_SEEK_SET) != -1) {
-        if (SDL_RWread(handle, pData, 1, bytesToRead) == bytesToRead) {
-            *bytesRead = bytesToRead;
-            m_LastError = Success;
-            return Complete;
-        }
+    int ret;
+
+    ret = SDL_RWseek(handle, position, RW_SEEK_SET);
+    if (ret == -1) {
+        rReleasePrintf("Failed to seek file %s: %s\n", fileName, SDL_GetError());
+        m_LastError = FileNotFound;
+        return Error;
     }
 
-    //
-    // Failed!
-    //
-    m_LastError = FileNotFound;
-    return Error;
+    ret = SDL_RWread(handle, pData, 1, bytesToRead);
+    if (ret == 0) {
+        rReleasePrintf("Failed to read file %s: %s (%d bytes read)\n", fileName, SDL_GetError(), ret);
+        m_LastError = FileNotFound;
+        return Error;
+    }
+
+    *bytesRead = ret;
+    m_LastError = Success;
+    return Complete;
 }
 
 //=============================================================================

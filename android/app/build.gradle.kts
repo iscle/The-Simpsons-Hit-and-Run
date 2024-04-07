@@ -24,6 +24,10 @@ android {
         }
     }
 
+    androidResources {
+        ignoreAssetsPattern = ""
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
