@@ -70,6 +70,7 @@ endif()
 add_compile_definitions(
 	RAD_CONSOLE
 	RAD_WIN32
+	RAD_SDL
 )
 
 option(SRR2_PAL OFF)
@@ -684,7 +685,8 @@ set(RADCORE_SOURCES
 	"libs/radcore/src/radfile/common/radfile.cpp"
 	"libs/radcore/src/radfile/common/remotedrive.cpp"
 	"libs/radcore/src/radfile/common/requests.cpp"
-	"libs/radcore/src/radfile/win32/win32drive.cpp"
+#	"libs/radcore/src/radfile/win32/win32drive.cpp"
+	"libs/radcore/src/radfile/sdl/sdldrive.cpp"
 	"libs/radcore/src/radkey/radkey.cpp"
 	"libs/radcore/src/radmemory/align.cpp"
 	"libs/radcore/src/radmemory/binallocator.cpp"
