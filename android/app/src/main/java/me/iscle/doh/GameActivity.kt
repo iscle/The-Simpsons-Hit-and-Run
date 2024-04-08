@@ -10,7 +10,8 @@ class GameActivity : SDLActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+
+        if (SettingsManager.ignoreCutout && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 window.attributes.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
             } else {
@@ -18,6 +19,16 @@ class GameActivity : SDLActivity() {
             }
         }
         super.onCreate(savedInstanceState)
+    }
+
+    override fun getArguments(): Array<String> {
+        val args = mutableListOf<String>()
+
+        if (SettingsManager.showFps) {
+            args.add("FPS")
+        }
+
+        return args.toTypedArray()
     }
 
     override fun getLibraries(): Array<String> {
