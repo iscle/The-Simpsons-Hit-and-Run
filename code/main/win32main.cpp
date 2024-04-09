@@ -31,6 +31,10 @@
 unsigned int sceLibcHeapSize = 16 * 1024 * 1024;
 #endif
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 //========================================
 // Project Includes
 //========================================
@@ -41,9 +45,6 @@ unsigned int sceLibcHeapSize = 16 * 1024 * 1024;
 #include <memory/memoryutilities.h>
 #include <memory/srrmemory.h>
 #include <p3d/entity.hpp>
-#ifdef __ANDROID__
-#include <android/log.h>
-#endif
 
 //========================================
 // Forward Declarations
