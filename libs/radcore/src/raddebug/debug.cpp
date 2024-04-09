@@ -408,7 +408,7 @@ void rDebuggerString_Implementation( const char* string )
 		
     #else
 
-    SDL_Log( "%s", string );
+    SDL_LogDebug( SDL_LOG_CATEGORY_APPLICATION, "%s", string );
 
     #endif
 }
