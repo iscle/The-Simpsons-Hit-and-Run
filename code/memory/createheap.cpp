@@ -294,7 +294,7 @@ IRadMemoryHeap** GetHeapReference( GameMemoryAllocator allocator )
 //=============================================================================
 size_t GetTotalMemoryFreeInAllHeaps()
 {
-    unsigned int totalFreeMemory = 0;
+    size_t totalFreeMemory = 0;
     unsigned int i;
     unsigned int size = NUM_GAME_MEMORY_ALLOCATORS;
     for( i = 0; i < size; ++i )

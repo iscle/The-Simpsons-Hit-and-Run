@@ -67,7 +67,7 @@ private:
     Scrooby::Group* m_loadingBarGroup;
     Slider m_loadingBar;
     float m_currentMemoryUsage;     // in percent
-    int m_startingMemoryAvailable;  // in bytes
+    size_t m_startingMemoryAvailable;  // in bytes
     unsigned int m_elapsedFireTime;
 
     Scrooby::Layer* m_explosionLayer;

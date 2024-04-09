@@ -505,7 +505,7 @@ CGuiScreenLoadingFE::GetCurrentMemoryUsage( ContextEnum currentContext ) const
 #ifdef RAD_XBOX
     int totalMemoryFree = Memory::GetTotalMemoryFree();
 #else
-    int totalMemoryFree = GetTotalMemoryFreeInAllHeaps();
+    size_t totalMemoryFree = GetTotalMemoryFreeInAllHeaps();
 #endif
 
     if( totalMemoryFree > 0 )
