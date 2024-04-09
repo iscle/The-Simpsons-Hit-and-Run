@@ -24,9 +24,9 @@ class GameActivity : SDLActivity() {
     override fun getArguments(): Array<String> {
         val args = mutableListOf<String>()
 
-        if (SettingsManager.showFps) {
-            args.add("FPS")
-        }
+        SettingsManager.args
+            .split(",")
+            .forEach(args::add)
 
         return args.toTypedArray()
     }

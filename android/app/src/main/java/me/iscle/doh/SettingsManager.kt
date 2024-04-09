@@ -14,7 +14,7 @@ object SettingsManager {
         get() = preferences.getBoolean("ignoreCutout", false)
         set(value) = preferences.edit().putBoolean("ignoreCutout", value).apply()
 
-    var showFps: Boolean
-        get() = preferences.getBoolean("showFps", false)
-        set(value) = preferences.edit().putBoolean("showFps", value).apply()
+    var args: String
+        get() = preferences.getString("args", null) ?: ""
+        set(value) = preferences.edit().putString("args", value).apply()
 }

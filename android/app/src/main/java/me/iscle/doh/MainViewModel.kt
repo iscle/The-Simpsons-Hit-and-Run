@@ -8,16 +8,16 @@ class MainViewModel : ViewModel() {
     private val _ignoreCutout = MutableStateFlow(SettingsManager.ignoreCutout)
     val ignoreCutout = _ignoreCutout.asStateFlow()
 
-    private val _showFps = MutableStateFlow(SettingsManager.showFps)
-    val showFps = _showFps.asStateFlow()
+    private val _args = MutableStateFlow(SettingsManager.args)
+    val args = _args.asStateFlow()
 
     fun setIgnoreCutout(ignoreCutout: Boolean) {
         SettingsManager.ignoreCutout = ignoreCutout
         _ignoreCutout.value = ignoreCutout
     }
 
-    fun setShowFps(showFps: Boolean) {
-        SettingsManager.showFps = showFps
-        _showFps.value = showFps
+    fun setArgs(args: String) {
+        SettingsManager.args = args
+        _args.value = args
     }
 }

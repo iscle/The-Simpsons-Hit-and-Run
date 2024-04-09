@@ -13,6 +13,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,7 +39,7 @@ class MainActivity : ComponentActivity() {
                         val context = LocalContext.current
                         val viewModel: MainViewModel = viewModel()
                         val ignoreCutout = viewModel.ignoreCutout.collectAsState().value
-                        val showFps = viewModel.showFps.collectAsState().value
+                        val args = viewModel.args.collectAsState().value
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically
@@ -53,10 +54,10 @@ class MainActivity : ComponentActivity() {
                         Row(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Show FPS")
-                            Switch(
-                                checked = showFps,
-                                onCheckedChange = viewModel::setShowFps
+                            Text("Args")
+                            TextField(
+                                value = args,
+                                onValueChange = viewModel::setArgs
                             )
                         }
 
