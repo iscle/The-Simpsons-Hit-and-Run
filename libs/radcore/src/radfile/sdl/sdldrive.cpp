@@ -194,7 +194,6 @@ radDrive::CompletionStatus radSdlDrive::OpenFile
             break;
     }
     if (*pHandle == NULL) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to open file %s (%s): %s\n", fixedPath, fileName, SDL_GetError());
         m_LastError = FileNotFound;
         return Error;
     }
@@ -238,14 +237,12 @@ radDrive::CompletionStatus radSdlDrive::ReadFile
 
     ret = SDL_RWseek(handle, position, RW_SEEK_SET);
     if (ret == -1) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to seek file %s: %s\n", fileName, SDL_GetError());
         m_LastError = FileNotFound;
         return Error;
     }
 
     ret = SDL_RWread(handle, pData, 1, bytesToRead);
     if (ret == 0) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to read file %s: %s (%d bytes read)\n", fileName, SDL_GetError(), ret);
         m_LastError = FileNotFound;
         return Error;
     }
@@ -279,14 +276,12 @@ radDrive::CompletionStatus radSdlDrive::WriteFile
 
     ret = SDL_RWseek(handle, position, RW_SEEK_SET);
     if (ret == -1) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to seek file %s: %s\n", fileName, SDL_GetError());
         m_LastError = FileNotFound;
         return Error;
     }
 
     ret = SDL_RWwrite(handle, pData, 1, bytesToWrite);
     if (ret != bytesToWrite) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Failed to write file %s: %s (%d bytes written)\n", fileName, SDL_GetError(), ret);
         m_LastError = FileNotFound;
         return Error;
     }
