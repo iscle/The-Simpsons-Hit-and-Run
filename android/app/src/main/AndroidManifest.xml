@@ -43,6 +43,9 @@
     <!-- Allow access to the vibrator -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Allow access to the internet (for debugging purposes) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:name=".DohApp"
         android:allowBackup="true"
