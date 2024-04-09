@@ -31,7 +31,15 @@ class radDrive;
 // Typedefs
 //=============================================================================
 
-#if defined( RAD_WIN32 ) || defined( RAD_XBOX )
+#ifdef RAD_SDL
+// TODO: Do we really need to include <filesystem> and rely on it here?
+#include <SDL.h>
+#include <filesystem>
+typedef SDL_RWops* radFileHandle;
+typedef std::filesystem::directory_iterator radFileDirHandle;
+#endif
+
+#if (defined( RAD_WIN32 ) || defined( RAD_XBOX )) && !defined RAD_SDL
 #include <SDL.h>
 #include <filesystem>
 typedef SDL_RWops* radFileHandle;
