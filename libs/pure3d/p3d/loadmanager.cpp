@@ -2,7 +2,7 @@
 // Copyright (c) 2002 Radical Games Ltd.  All rights reserved.
 //=============================================================================
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include <p3d/loadmanager.hpp>
 #include <p3d/inventory.hpp>

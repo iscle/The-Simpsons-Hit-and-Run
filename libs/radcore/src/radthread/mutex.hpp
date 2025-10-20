@@ -24,7 +24,7 @@
 // Include Files
 //=============================================================================
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 #include <radobject.hpp>
 #include <radmemory.hpp>
 #include <radthread.hpp>
@@ -82,7 +82,7 @@ class radThreadMutex : public IRadThreadMutex,
     //
     unsigned int m_ReferenceCount;    
 
-    SDL_mutex* m_Mutex;
+    SDL_Mutex* m_Mutex;
 };
 
 #endif

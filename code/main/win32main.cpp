@@ -19,7 +19,7 @@
 #include <radobject.hpp>
 // file reading before radtech
 #include <stdio.h>
-#include <SDL_main.h>
+#include <SDL3/SDL_main.h>
 
 #ifdef __SWITCH__
 #include <switch.h>
@@ -93,9 +93,9 @@ extern "C" int main( int argc, char *argv[] )
     //
     // Initialize SDL subsystems
     //
-    SDL_Init( SDL_INIT_EVENTS | SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER );
-	
-    SDL_LogSetOutputFunction( LogOutputFunction, NULL );
+    SDL_Init( SDL_INIT_EVENTS | SDL_INIT_VIDEO | SDL_INIT_GAMEPAD );
+
+    SDL_SetLogOutputFunction( LogOutputFunction, NULL );
 
     //
     // Have to get FTech setup first so that we can use all the memory services.

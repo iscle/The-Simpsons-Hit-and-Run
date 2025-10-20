@@ -28,7 +28,7 @@
 #include <p3d/utility.hpp>
 
 #ifdef RAD_WIN32
-#include <SDL.h>  // for SDL_PollEvent...
+#include <SDL3/SDL.h>  // for SDL_PollEvent...
 #endif
 
 //========================================
@@ -506,7 +506,7 @@ void Game::Run()
         SDL_Event msg;
         while( SDL_PollEvent( &msg ) )
         {
-            if( msg.type == SDL_QUIT )
+            if( msg.type == SDL_EVENT_QUIT )
             {
                 //Chuck someone closed the Window we are going to try to exit the game 
                 //if the game isnt in a context that can easily transition to the EXIT context we 

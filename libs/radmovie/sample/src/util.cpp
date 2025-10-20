@@ -28,7 +28,7 @@
 #endif
 
 #ifdef RAD_WIN32
-#include <SDL.h>
+#include <SDL3/SDL.h>
 SDL_Window* g_pWnd = 0;
 extern bool g_Done;
 #endif

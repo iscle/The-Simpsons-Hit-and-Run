@@ -5,11 +5,12 @@
 
 #ifndef _GLSURF_HPP_
 #define _GLSURF_HPP_
+#include <SDL3/SDL.h>
 #include <pddi/pddi.hpp>
 
 class pglContext;
 class pglWrapper;
-struct SDL_mutex;
+struct SDL_Mutex;
 
 class pglDisplay : public pddiDisplay
 {
@@ -50,8 +51,6 @@ public:
     bool CheckExtension(const char*);
     bool HasReset(void) { return reset; }
 
-    static unsigned FillDisplayModes(int, pddiModeInfo*);
-
     void BeginContext(void);
     void EndContext(void);
 
@@ -74,8 +73,8 @@ private:
     float gammaR,gammaG,gammaB;
 
     SDL_Window* win;
-    void* hRC;
-    void* prevRC;
+    SDL_GLContext hRC;
+    SDL_GLContext prevRC;
 
     bool extBGRA;
     bool reset;

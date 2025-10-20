@@ -24,7 +24,7 @@
 // Include Files
 //=============================================================================
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include <radobject.hpp>
 #include <radmemory.hpp>
@@ -83,7 +83,7 @@ class radThreadSemaphore : public IRadThreadSemaphore,
     //
     unsigned int m_ReferenceCount;    
 
-    SDL_sem* m_Semaphore;
+    SDL_Semaphore* m_Semaphore;
 };
 
 #endif

@@ -43,8 +43,6 @@ public:
     void SetContext(pglContext* c) {context = c;}
     bool ExtBGRA(void) { return extBGRA;}
 
-    static unsigned FillDisplayModes(pddiModeInfo*);
-
 private:
     pddiDisplayMode mode;
     int winWidth;

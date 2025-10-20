@@ -13,7 +13,7 @@
 // Includes
 //===========================================================================
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include <p3d/chunkfile.hpp>
 #include <p3d/inventory.hpp>

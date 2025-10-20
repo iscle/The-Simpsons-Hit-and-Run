@@ -2,7 +2,7 @@
  * choreo/load.cpp
  */
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include <choreo/load.hpp>
 #include <choreo/scriptreader.hpp>

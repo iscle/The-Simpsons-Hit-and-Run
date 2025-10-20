@@ -6,7 +6,7 @@
 #include <pddi/gles/glcon.hpp>
 #include <pddi/gles/gldisplay.hpp>
 #include <pddi/base/debug.hpp>
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include<stdio.h>
 #include<string.h>
@@ -14,7 +14,7 @@
 
 bool pglDisplay::CheckExtension( const char *extName )
 {
-    return SDL_GL_ExtensionSupported(extName) == SDL_TRUE;
+    return SDL_GL_ExtensionSupported(extName) == true;
 }
 
 pglDisplay ::pglDisplay(pddiDisplayInfo* info)
@@ -42,23 +42,24 @@ pglDisplay ::pglDisplay(pddiDisplayInfo* info)
 pglDisplay ::~pglDisplay()
 {
     /* release and free the device context and rendering context */
-    SDL_GL_DeleteContext(hRC);
-    SDL_SetWindowGammaRamp(win, initialGammaRamp[0], initialGammaRamp[1], initialGammaRamp[2]);
+    SDL_GL_DestroyContext(hRC);
+//    SDL_SetWindowGammaRamp(win, initialGammaRamp[0], initialGammaRamp[1], initialGammaRamp[2]);
 }
 
 #define KEYPRESSED(x) (GetKeyState((x)) & (1<<(sizeof(int)*8)-1))
 
 long pglDisplay ::ProcessWindowMessage(SDL_Window* win, const SDL_WindowEvent* event)
 {
-    switch (event->event)
+    switch (event->type)
     {
-        case SDL_WINDOWEVENT_SIZE_CHANGED:
-            SDL_GL_GetDrawableSize( win, &winWidth, &winHeight );
+        case SDL_EVENT_WINDOW_RESIZED:
+        case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+            SDL_GetWindowSizeInPixels( win, &winWidth, &winHeight );
             break;
 
-        case SDL_WINDOWEVENT_CLOSE:
+        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
             /* release and free the device context and rendering context */
-            SDL_GL_DeleteContext(hRC);
+            SDL_GL_DestroyContext(hRC);
             break;
 
 		default:
@@ -72,7 +73,7 @@ long pglDisplay ::ProcessWindowMessage(SDL_Window* win, const SDL_WindowEvent* e
 
 void pglDisplay ::SetWindow(SDL_Window* wnd)
 {
-    SDL_GetWindowGammaRamp(wnd, initialGammaRamp[0], initialGammaRamp[1], initialGammaRamp[2]);
+//    SDL_GetWindowGammaRamp(wnd, initialGammaRamp[0], initialGammaRamp[1], initialGammaRamp[2]);
     win = wnd;
 }
 
@@ -136,17 +137,15 @@ bool pglDisplay ::InitDisplay(const pddiDisplayInit* init)
     reset = true;
 
     mode = m;
-    SDL_DisplayMode displayMode = {}, closestMode = {};
-    displayMode.w = x;
-    displayMode.h = y;
-    SDL_DisplayMode* pDisplayMode = SDL_GetClosestDisplayMode(displayInfo->id, &displayMode, &closestMode);
-    if (pDisplayMode)
-        SDL_SetWindowDisplayMode(win, pDisplayMode);
+
+    SDL_DisplayMode pDisplayMode;
+    if (SDL_GetClosestFullscreenDisplayMode(displayInfo->id, x, y, 0.0f, true, &pDisplayMode))
+        SDL_SetWindowFullscreenMode(win, &pDisplayMode);
 
 #ifndef __SWITCH__
-    SDL_SetWindowFullscreen(win, mode == PDDI_DISPLAY_FULLSCREEN ? SDL_WINDOW_FULLSCREEN : 0);
+    SDL_SetWindowFullscreen(win, mode == PDDI_DISPLAY_FULLSCREEN);
 #endif
-    SDL_GL_GetDrawableSize( win, &winWidth, &winHeight );
+    SDL_GetWindowSizeInPixels( win, &winWidth, &winHeight );
     winBitDepth = bpp;
 
     if (hRC)
@@ -168,7 +167,7 @@ bool pglDisplay ::InitDisplay(const pddiDisplayInit* init)
     else
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
 #ifndef RAD_VITA
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, SDL_TRUE);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, true);
 #ifdef RAD_DEBUG
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 #endif
@@ -296,7 +295,7 @@ void pglDisplay::SetGamma(float r, float g, float b)
         gamma[2][i] =  (Uint16)(65535.0 * ((1.0 < gcb) ? 1.0 : gcb));
     }
 
-    SDL_SetWindowGammaRamp(win, gamma[0], gamma[1], gamma[2]);
+//    SDL_SetWindowGammaRamp(win, gamma[0], gamma[1], gamma[2]);
 }
 
 void pglDisplay::SwapBuffers(void)
@@ -326,26 +325,6 @@ unsigned pglDisplay::Screenshot(pddiColour* buffer, int nBytes)
     }
 
     return winHeight * winWidth * 4;
-}
-
-unsigned pglDisplay::FillDisplayModes(int displayIndex, pddiModeInfo* displayModes)
-{
-    int nModes = 0;
-
-    SDL_DisplayMode devMode;
-
-    for (int i = 0; i < SDL_GetNumDisplayModes(displayIndex); i++)
-    {
-        if(SDL_GetDisplayMode(displayIndex, i, &devMode) == 0)
-        {
-            displayModes[nModes].width = devMode.w;
-            displayModes[nModes].height = devMode.h;
-            displayModes[nModes].bpp = 32;
-            nModes++;
-        }
-    }
-
-    return nModes;
 }
 
 void pglDisplay::BeginTiming()

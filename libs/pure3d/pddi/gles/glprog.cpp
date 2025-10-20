@@ -8,7 +8,7 @@
 
 #include <string>
 #include <vector>
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 static inline void UniformColour(GLint loc, pddiColour c)
 {

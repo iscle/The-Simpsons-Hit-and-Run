@@ -26,7 +26,7 @@
 #include <radobjectlist.hpp>
 #include <radstring.hpp>
 #include <raddebug.hpp>
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #ifdef WIN32
 #include <windows.h>

@@ -170,14 +170,6 @@ unsigned pglDisplay::Screenshot(pddiColour* buffer, int nBytes)
     // not implemented under linux
     assert(0 && "PDDI: pddiDisplay::ScreenShot() - Not implemented under linux.");
 }
-
-unsigned pglDisplay::FillDisplayModes(pddiModeInfo* displayModes)
-{
-    int i = 0;
-    int nModes = 0;
-
-    return nModes;
-}
     
 void pglDisplay::BeginTiming()
 {

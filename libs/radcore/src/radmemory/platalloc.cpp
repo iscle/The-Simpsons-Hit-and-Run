@@ -139,7 +139,20 @@ void * radMemoryPlatAllocAligned( unsigned int numberOfBytes, unsigned int align
 {
 	#ifndef WIN32
 
-		return ::aligned_alloc( alignment, numberOfBytes );
+        #ifdef __ANDROID__
+
+            void * ptr = nullptr;
+
+            if ( posix_memalign( &ptr, alignment, numberOfBytes ) != 0 )
+                return nullptr;
+
+            return ptr;
+
+        #else
+
+            return ::aligned_alloc( alignment, numberOfBytes );
+
+        #endif
 
 	#else
 

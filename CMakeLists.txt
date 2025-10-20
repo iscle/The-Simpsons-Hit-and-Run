@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.22.1)
 
 project(SRR2)
 
@@ -24,7 +24,7 @@ if(CCACHE_FOUND)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
 endif()
 
-find_package(SDL2 REQUIRED)
+find_package(SDL3 REQUIRED)
 find_package(PNG REQUIRED)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
@@ -1189,7 +1189,7 @@ target_include_directories(radcore
 	PUBLIC "code/" # wtf (radobject.hpp includes memory/classsizetracker.h)
 )
 target_compile_features(radcore PUBLIC cxx_std_17)
-target_link_libraries(radcore SDL2::SDL2)
+target_link_libraries(radcore SDL3::SDL3)
 
 add_library(radcontent STATIC ${RADCONTENT_SOURCES})
 target_include_directories(radcontent
@@ -1211,7 +1211,7 @@ else()
 	target_include_directories(pddi PRIVATE "libs/pure3d/pddi/gl/glad/include/")
 endif()
 target_link_libraries(pddi
-	SDL2::SDL2
+	SDL3::SDL3
 	radmath
 	radcore
 )
@@ -1279,7 +1279,7 @@ if(SRR2_BUILD_TESTS)
 		"code/main/tuidunaligned.cpp")
 	target_link_libraries(simplemovie
 		radmovie
-		SDL2::SDL2
+		SDL3::SDL3
 		p3d
 		pddi
 		radcore
@@ -1407,8 +1407,7 @@ endif()
 
 add_executable(${PROJECT_NAME} ${SRR2_SOURCES})
 target_link_libraries(${PROJECT_NAME}
-	SDL2::SDL2
-	SDL2::SDL2main
+	SDL3::SDL3
 	choreo
 	p3d
 	pddi

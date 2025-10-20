@@ -12,7 +12,7 @@
 #include <pddi/base/debug.hpp>
 #include <math.h>
 #include <string.h>
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include <microprofile.h>
 

@@ -24,7 +24,7 @@
 
 #include "pch.hpp"
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include <raddebug.hpp>
 #include <radthread.hpp>
@@ -47,7 +47,7 @@ static bool g_SystemInitialized = false;
 //
 // Need an exclusion object for each of the various platforms.
 //
-static SDL_mutex* g_ExclusionObject = nullptr;
+static SDL_Mutex* g_ExclusionObject = nullptr;
 
 //=============================================================================
 // Public Functions

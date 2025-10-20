@@ -2,7 +2,7 @@
 // Copyright (c) 2002 Radical Games Ltd.  All rights reserved.
 //=============================================================================
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include <p3d/imagefactory.hpp>
 #include <p3d/context.hpp>
