@@ -80,6 +80,7 @@ static const char * g_Sdlipt[] =
 
 static SDLInputPoint g_SDLPoints[] =
 {
+#if SDL_MAJOR_VERSION < 3
     { g_Sdlipt[ 0 ], "DPadUp",           SDL_CONTROLLER_BUTTON_DPAD_UP },
     { g_Sdlipt[ 0 ], "DPadDown",         SDL_CONTROLLER_BUTTON_DPAD_DOWN },
     { g_Sdlipt[ 0 ], "DPadLeft",         SDL_CONTROLLER_BUTTON_DPAD_LEFT },
@@ -107,6 +108,35 @@ static SDLInputPoint g_SDLPoints[] =
     { g_Sdlipt[ 3 ], "LeftStickY",       SDL_CONTROLLER_AXIS_LEFTY },
     { g_Sdlipt[ 2 ], "RightStickX",      SDL_CONTROLLER_AXIS_RIGHTX },
     { g_Sdlipt[ 3 ], "RightStickY",      SDL_CONTROLLER_AXIS_RIGHTY }
+#else
+    { g_Sdlipt[ 0 ], "DPadUp",           SDL_GAMEPAD_BUTTON_DPAD_UP },
+    { g_Sdlipt[ 0 ], "DPadDown",         SDL_GAMEPAD_BUTTON_DPAD_DOWN },
+    { g_Sdlipt[ 0 ], "DPadLeft",         SDL_GAMEPAD_BUTTON_DPAD_LEFT },
+    { g_Sdlipt[ 0 ], "DPadRight",        SDL_GAMEPAD_BUTTON_DPAD_RIGHT },
+    { g_Sdlipt[ 0 ], "Start",            SDL_GAMEPAD_BUTTON_START },
+    { g_Sdlipt[ 0 ], "Back",             SDL_GAMEPAD_BUTTON_BACK },
+    { g_Sdlipt[ 0 ], "LeftThumb",        SDL_GAMEPAD_BUTTON_LEFT_STICK },
+    { g_Sdlipt[ 0 ], "RightThumb",       SDL_GAMEPAD_BUTTON_RIGHT_STICK },
+#ifdef __SWITCH__
+    { g_Sdlipt[ 0 ], "A",                SDL_GAMEPAD_BUTTON_EAST },
+    { g_Sdlipt[ 0 ], "B",                SDL_GAMEPAD_BUTTON_SOUTH },
+    { g_Sdlipt[ 0 ], "X",                SDL_GAMEPAD_BUTTON_NORTH },
+    { g_Sdlipt[ 0 ], "Y",                SDL_GAMEPAD_BUTTON_WEST },
+#else
+    { g_Sdlipt[ 0 ], "A",                SDL_GAMEPAD_BUTTON_SOUTH },
+    { g_Sdlipt[ 0 ], "B",                SDL_GAMEPAD_BUTTON_EAST },
+    { g_Sdlipt[ 0 ], "X",                SDL_GAMEPAD_BUTTON_WEST },
+    { g_Sdlipt[ 0 ], "Y",                SDL_GAMEPAD_BUTTON_NORTH },
+#endif
+    { g_Sdlipt[ 0 ], "Black",            SDL_GAMEPAD_BUTTON_LEFT_SHOULDER },
+    { g_Sdlipt[ 0 ], "White",            SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER },
+    { g_Sdlipt[ 1 ], "LeftTrigger",      SDL_GAMEPAD_AXIS_LEFT_TRIGGER },
+    { g_Sdlipt[ 1 ], "RightTrigger",     SDL_GAMEPAD_AXIS_RIGHT_TRIGGER },
+    { g_Sdlipt[ 2 ], "LeftStickX",       SDL_GAMEPAD_AXIS_LEFTX },
+    { g_Sdlipt[ 3 ], "LeftStickY",       SDL_GAMEPAD_AXIS_LEFTY },
+    { g_Sdlipt[ 2 ], "RightStickX",      SDL_GAMEPAD_AXIS_RIGHTX },
+    { g_Sdlipt[ 3 ], "RightStickY",      SDL_GAMEPAD_AXIS_RIGHTY }
+#endif
 };
 
 static class radControllerSystemSDL* s_pTheSDLControllerSystem2 = NULL;
@@ -252,16 +282,28 @@ class radControllerInputPointSDL
         {
             if ( m_pType == g_Sdlipt[ 0 ] ) // Button
             {
+#if SDL_MAJOR_VERSION < 3
                 newValue = SDL_GameControllerGetButton( m_pController, (SDL_GameControllerButton)m_Identifier ) ? 1.0f : 0.0f;
+#else
+                newValue = SDL_GetGamepadButton( m_pController, (SDL_GamepadButton)m_Identifier ) ? 1.0f : 0.0f;
+#endif
             }
             else if ( m_pType == g_Sdlipt[ 1 ] ) // Analog Button
             {
+#if SDL_MAJOR_VERSION < 3
                 newValue = SDL_GameControllerGetAxis( m_pController, (SDL_GameControllerAxis)m_Identifier );
+#else
+                newValue = SDL_GetGamepadAxis( m_pController, (SDL_GamepadAxis)m_Identifier );
+#endif
                 newValue /= 32767.0f;
             }
             else if ( ( m_pType == g_Sdlipt[ 2 ] ) || ( m_pType == g_Sdlipt[ 3 ] ) ) // X/Y Axis
             {
+#if SDL_MAJOR_VERSION < 3
                 newValue = SDL_GameControllerGetAxis( m_pController, (SDL_GameControllerAxis)m_Identifier );
+#else
+                newValue = SDL_GetGamepadAxis( m_pController, (SDL_GamepadAxis)m_Identifier );
+#endif
                 if ( newValue > 0.0f )
                 {
                     newValue /= 65534.0f;
@@ -273,7 +315,11 @@ class radControllerInputPointSDL
 
                 newValue += 0.5f;
 
+#if SDL_MAJOR_VERSION < 3
                 if ( m_Identifier == SDL_CONTROLLER_AXIS_LEFTY || m_Identifier == SDL_CONTROLLER_AXIS_RIGHTY )
+#else
+                if ( m_Identifier == SDL_GAMEPAD_AXIS_LEFTY || m_Identifier == SDL_GAMEPAD_AXIS_RIGHTY )
+#endif
                 {
                     newValue = 1.0f - newValue;
                 }
@@ -545,8 +591,11 @@ class radControllerInputPointSDL
     //========================================================================
     // radControllerInputPointSDL::radControllerInputPointSDL
     //========================================================================
-
+#if SDL_MAJOR_VERSION < 3
     radControllerInputPointSDL( SDL_GameController * pController, const char * pType, const char * pName, int id )
+#else
+    radControllerInputPointSDL( SDL_Gamepad * pController, const char * pType, const char * pName, int id )
+#endif
         :
         radRefCount( 0 ),
         m_Value( 0.0f ),
@@ -594,7 +643,11 @@ class radControllerInputPointSDL
     const char * m_pName;
 
     int m_Identifier;
+#if SDL_MAJOR_VERSION < 3
     SDL_GameController * m_pController;
+#else
+    SDL_Gamepad * m_pController;
+#endif
 
     ref< IRadObjectList > m_xIOl_Callbacks;
 };
@@ -628,7 +681,11 @@ class radControllerSDL
         {
             if ( m_pController != NULL )
             {
+#if SDL_MAJOR_VERSION < 3
                 SDL_GameControllerUpdate();
+#else
+                SDL_UpdateGamepads();
+#endif
             }
 
             //
@@ -656,8 +713,13 @@ class radControllerSDL
                     int result = 0;
 					if(m_pController != NULL)
 					{
+#if SDL_MAJOR_VERSION < 3
                         result = SDL_GameControllerRumble( m_pController,
                             m_LeftGain, m_RightGain, 0 );
+#else
+                        result = SDL_RumbleGamepad( m_pController,
+                            m_LeftGain, m_RightGain, 0 );
+#endif
 					}
 
                     //
@@ -732,7 +794,11 @@ class radControllerSDL
 
     virtual bool IsConnected( void )
     {
+#if SDL_MAJOR_VERSION < 3
         return SDL_GameControllerGetAttached( m_pController ) == SDL_TRUE;
+#else
+        return SDL_GamepadConnected( m_pController );
+#endif
     }
 
     //========================================================================
@@ -1019,7 +1085,11 @@ class radControllerSDL
     radControllerSDL
     (
         unsigned int thisAllocator,
-        SDL_GameController* pController,
+#if SDL_MAJOR_VERSION < 3
+        SDL_GameController * pController,
+#else
+        SDL_Gamepad * pController,
+#endif
         unsigned int virtualTime,
         unsigned int bufferTime,
         unsigned int pollingRate
@@ -1048,8 +1118,11 @@ class radControllerSDL
         //
         // Create our location name based on our port and slot
         //
-
+#if SDL_MAJOR_VERSION < 3
         int iController = std::max(SDL_GameControllerGetPlayerIndex( pController ), 0);
+#else
+        int iController = std::max(SDL_GetGamepadPlayerIndex( pController ), 0);
+#endif
 		m_xIString_Location->SetSize( 12 );
         m_xIString_Location->Append( "Port" );
         m_xIString_Location->Append( (unsigned int) iController );
@@ -1110,8 +1183,11 @@ class radControllerSDL
     //========================================================================
     // radControllerSDL Data Members
     //========================================================================
-
+#if SDL_MAJOR_VERSION < 3
     SDL_GameController *              m_pController;
+#else
+    SDL_Gamepad *                     m_pController;
+#endif
 
     ref< IRadObjectList >             m_xIOl_InputPoints;
     ref< IRadObjectList >             m_xIOl_OutputPoints;
@@ -1138,19 +1214,30 @@ class radControllerSystemSDL
      //========================================================================
     // radControllerSystemSDL::CheckDeviceConnectionStatus
     //========================================================================
-
+#if SDL_MAJOR_VERSION < 3
     static int CheckDeviceConnectionStatus( void * userdata, SDL_Event * event )
+#else
+    static bool CheckDeviceConnectionStatus( void * userdata, SDL_Event * event )
+#endif
     {
         //
         // Check if devices have been inserted or removed
         //
-        SDL_GameController* pController;
+#if SDL_MAJOR_VERSION < 3
+        SDL_GameController * pController;
         if( event->type == SDL_CONTROLLERDEVICEADDED )
             pController = SDL_GameControllerOpen( event->cdevice.which );
         else if( event->type == SDL_CONTROLLERDEVICEREMOVED )
             pController = SDL_GameControllerFromInstanceID( event->cdevice.which );
+#else
+        SDL_Gamepad * pController;
+        if( event->type == SDL_EVENT_GAMEPAD_ADDED )
+            pController = SDL_OpenGamepad( event->cdevice.which );
+        else if( event->type == SDL_EVENT_GAMEPAD_REMOVED )
+            pController = SDL_GetGamepadFromID( event->cdevice.which );
+#endif
         else
-            return 1;
+            return true;
 
         radControllerSystemSDL* sys = (radControllerSystemSDL*)userdata;
         sys->AddRef( );
@@ -1163,7 +1250,11 @@ class radControllerSystemSDL
 
         char location[255];
 
+#if SDL_MAJOR_VERSION < 3
         int iController = std::max( SDL_GameControllerGetPlayerIndex( pController ), 0 );
+#else
+        int iController = std::max( SDL_GetGamepadPlayerIndex( pController ), 0 );
+#endif
         sprintf( location, "Port%d\\Slot0", iController );
 
         xIController2 = sys->GetControllerAtLocation( location );
@@ -1174,7 +1265,11 @@ class radControllerSystemSDL
             rAssert( xISDLController2 != NULL );
         }
 
+#if SDL_MAJOR_VERSION < 3
         if( event->type == SDL_CONTROLLERDEVICEADDED )
+#else
+        if( event->type == SDL_EVENT_GAMEPAD_ADDED )
+#endif
         {
             //
             // Here a device has been inserted, so open it
@@ -1214,10 +1309,14 @@ class radControllerSystemSDL
             else
             {
                 sys->Release( );
-                return 0;
+                return false;
             }
         }
+#if SDL_MAJOR_VERSION < 3
         else if( event->type == SDL_CONTROLLERDEVICEREMOVED )
+#else
+        else if( event->type == SDL_EVENT_GAMEPAD_REMOVED )
+#endif
         {
 			//
             // Here a device has been removed
@@ -1242,7 +1341,7 @@ class radControllerSystemSDL
         }
 
         sys->Release( );
-        return 0;
+        return false;
     }
 
     //========================================================================
@@ -1568,9 +1667,19 @@ class radControllerSystemSDL
         //
         // TODO: If there is no connection change callback, wait synchronously for the connection
         //
-        for( int i = 0; i < SDL_NumJoysticks(); i++ )
+#if SDL_MAJOR_VERSION < 3
+        int numJoysticks = SDL_NumJoysticks();
+#else
+        int numJoysticks;
+        SDL_JoystickID* joysticks = SDL_GetJoysticks( &numJoysticks );
+#endif
+        for( int i = 0; i < numJoysticks; i++ )
         {
+#if SDL_MAJOR_VERSION < 3
             if( SDL_IsGameController( i ) )
+#else
+            if( SDL_IsGamepad( joysticks[i] ) )
+#endif
             {
                 ref< IRadController > xIController2;
                 unsigned int virtualTime = 0;
@@ -1586,7 +1695,11 @@ class radControllerSystemSDL
                 xIController2 = new (g_ControllerSystemAllocator) radControllerSDL
                 (
                     g_ControllerSystemAllocator,
+#if SDL_MAJOR_VERSION < 3
                     SDL_GameControllerOpen( i ),
+#else
+                    SDL_OpenGamepad( joysticks[i] ),
+#endif
                     virtualTime,
                     m_EventBufferTime,
                     pollingRate
@@ -1609,6 +1722,9 @@ class radControllerSystemSDL
                 }
             }
         }
+#if SDL_MAJOR_VERSION > 2
+        SDL_free( joysticks );
+#endif
 
         //
         // Set everything to know state
@@ -1691,7 +1807,11 @@ void radControllerInitialize
 
 void radControllerTerminate( void )
 {
+#if SDL_MAJOR_VERSION < 3
     SDL_DelEventWatch( radControllerSystemSDL::CheckDeviceConnectionStatus, s_pTheSDLControllerSystem2 );
+#else
+    SDL_RemoveEventWatch( radControllerSystemSDL::CheckDeviceConnectionStatus, s_pTheSDLControllerSystem2 );
+#endif
 
     radRelease( s_pTheSDLControllerSystem2, NULL );
 }

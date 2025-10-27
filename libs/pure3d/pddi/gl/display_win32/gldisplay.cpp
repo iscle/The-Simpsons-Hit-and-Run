@@ -45,15 +45,20 @@ pglDisplay ::pglDisplay(pddiDisplayInfo* info)
 pglDisplay ::~pglDisplay()
 {
     /* release and free the device context and rendering context */
+#if SDL_MAJOR_VERSION < 3
     SDL_GL_DeleteContext(hRC);
     SDL_SetWindowGammaRamp(win, initialGammaRamp[0], initialGammaRamp[1], initialGammaRamp[2]);
+#else
+    SDL_GL_DestroyContext((SDL_GLContext)hRC);
+#endif
 }
 
 #define KEYPRESSED(x) (GetKeyState((x)) & (1<<(sizeof(int)*8)-1))
 
 long pglDisplay ::ProcessWindowMessage(SDL_Window* win, const SDL_WindowEvent* event)
 {
-    switch (event->event)
+#if SDL_MAJOR_VERSION < 3
+    switch(event->event)
     {
         case SDL_WINDOWEVENT_SIZE_CHANGED:
             SDL_GL_GetDrawableSize( win, &winWidth, &winHeight );
@@ -66,10 +71,26 @@ long pglDisplay ::ProcessWindowMessage(SDL_Window* win, const SDL_WindowEvent* e
 
 		default:
             return 0;
-     }
-     /* return 1 if handled message, 0 if not */
+    }
+#else
+    switch(event->type)
+    {
+        case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+            SDL_GetWindowSizeInPixels( win, &winWidth, &winHeight );
+            break;
 
-     return 1;
+        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+            /* release and free the device context and rendering context */
+            SDL_GL_DestroyContext((SDL_GLContext)hRC);
+            break;
+
+        default:
+            return 0;
+    }
+#endif
+
+    /* return 1 if handled message, 0 if not */
+    return 1;
 }
 
 
@@ -307,7 +328,9 @@ void pglDisplay::SetGamma(float r, float g, float b)
         gamma[2][i] =  (Uint16)(65535.0 * ((1.0 < gcb) ? 1.0 : gcb));
     }
 
+#if SDL_MAJOR_VERSION < 3
     SDL_SetWindowGammaRamp(win, gamma[0], gamma[1], gamma[2]);
+#endif
 }
 
 void pglDisplay::SwapBuffers(void)
@@ -345,27 +368,6 @@ unsigned pglDisplay::Screenshot(pddiColour* buffer, int nBytes)
     return winHeight * winWidth * 4;
 }
 
-unsigned pglDisplay::FillDisplayModes(int displayIndex, pddiModeInfo* displayModes)
-{
-    int nModes = 0;
-
-    SDL_DisplayMode devMode;
-
-    for (int i = 0; i < SDL_GetNumDisplayModes(displayIndex); i++)
-    {
-        if(SDL_GetDisplayMode(displayIndex, i, &devMode) == 0)
-        {
-            displayModes[nModes].width = devMode.w;
-            displayModes[nModes].height = devMode.h;
-            displayModes[nModes].bpp = 32;
-            nModes++;
-        }
-    }
-
-    return nModes;
-}
-    
-  
 void pglDisplay::BeginTiming()
 {
     beginTime = (float)SDL_GetTicks();

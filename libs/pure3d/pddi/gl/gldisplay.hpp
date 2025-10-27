@@ -53,8 +53,6 @@ public:
     bool CheckExtension(const char*);
     bool HasReset(void) { return reset; }
 
-    static unsigned FillDisplayModes(int, pddiModeInfo*);
-
     void BeginContext(void);
     void EndContext(void);
 

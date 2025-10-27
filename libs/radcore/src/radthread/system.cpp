@@ -47,7 +47,11 @@ static bool g_SystemInitialized = false;
 //
 // Need an exclusion object for each of the various platforms.
 //
+#if SDL_MAJOR_VERSION < 3
 static SDL_mutex* g_ExclusionObject = nullptr;
+#else
+static SDL_Mutex* g_ExclusionObject = nullptr;
+#endif
 
 //=============================================================================
 // Public Functions

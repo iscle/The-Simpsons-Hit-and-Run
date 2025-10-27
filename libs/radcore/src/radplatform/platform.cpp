@@ -33,7 +33,9 @@
 #include <SDL.h>
 #ifdef WIN32
 #include <windows.h>
+#if SDL_MAJOR_VERSION < 3
 #include <SDL_syswm.h>
+#endif
 #endif
 #endif 
 #ifdef RAD_XBOX
@@ -119,7 +121,11 @@ class radPlatform : public IRadPlatform
     //
     // Windows specific interfaces.
     //
+#if SDL_MAJOR_VERSION < 3
     static int SDLCALL MainWindowProcedure
+#else
+    static bool SDLCALL MainWindowProcedure
+#endif
     (
         void* userdata, SDL_Event* event
     );
@@ -136,7 +142,7 @@ class radPlatform : public IRadPlatform
 		
         rWarningMsg( m_pMainWindow != NULL, "hMainWindow set to NULL in platform component" );
 
-#ifdef WIN32
+#if defined(WIN32) && SDL_MAJOR_VERSION < 3
         SDL_VERSION( &m_wmInfo.version );
         SDL_GetWindowWMInfo( pMainWindow, &m_wmInfo );
 #endif
@@ -151,14 +157,22 @@ class radPlatform : public IRadPlatform
 
 #ifdef WIN32
 	virtual HWND GetMainWindowHandle( void )
-    {   
+    {
+#if SDL_MAJOR_VERSION < 3
         rWarningMsg( m_wmInfo.subsystem == SDL_SYSWM_WINDOWS, "WM info doesn't match the windows subsystem." );
 
         return( m_wmInfo.info.win.window );
+#else
+        return (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(m_pMainWindow), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+#endif
     }
     virtual HINSTANCE GetInstanceHandle( void )
     {
+#if SDL_MAJOR_VERSION < 3
         return( m_wmInfo.info.win.hinstance );
+#else
+        return (HINSTANCE)SDL_GetPointerProperty(SDL_GetWindowProperties(m_pMainWindow), SDL_PROP_WINDOW_WIN32_INSTANCE_POINTER, NULL);
+#endif
     }
 #endif
 
@@ -174,13 +188,17 @@ class radPlatform : public IRadPlatform
     {
         rAssert( pICallback != NULL );
 
+#if SDL_MAJOR_VERSION < 3
         SDL_DelEventWatch( MainWindowProcedure, pICallback );
+#else
+        SDL_RemoveEventWatch( MainWindowProcedure, pICallback );
+#endif
     }
 
     private:    
     
     SDL_Window* m_pMainWindow;
-#ifdef WIN32
+#if defined(WIN32) && SDL_MAJOR_VERSION < 3
     SDL_SysWMinfo m_wmInfo;
 #endif
 
@@ -543,7 +561,11 @@ void radPlatformInitialize( SDL_Window* pMainWindow, radMemoryAllocator allocato
     pthePlatform->Initialize( pMainWindow, allocator );
 }
 
+#if SDL_MAJOR_VERSION < 3
 int SDLCALL radPlatform::MainWindowProcedure
+#else
+bool SDLCALL radPlatform::MainWindowProcedure
+#endif
 (
     void* userdata, SDL_Event* event
 )
@@ -554,7 +576,7 @@ int SDLCALL radPlatform::MainWindowProcedure
 
     callback->OnWindowMessage( pThis->m_pMainWindow, event );
 
-    return 0;
+    return false;
 }
 
 #endif

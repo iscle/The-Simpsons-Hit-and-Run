@@ -30,6 +30,8 @@
 #include "semaphore.hpp"
 #include "system.hpp"
 
+#include <SDL.h>
+
 //=============================================================================
 // Local Definitions
 //=============================================================================
@@ -94,7 +96,7 @@ radThreadSemaphore::radThreadSemaphore( unsigned int count )
 { 
     radMemoryMonitorIdentifyAllocation( this, g_nameFTech, "radThreadSemaphore" );
 
-    m_Semaphore = SDL_CreateSemaphore(0);
+    m_Semaphore = (SDL_Semaphore*)SDL_CreateSemaphore(0);
 }
 
 //=============================================================================
@@ -112,7 +114,11 @@ radThreadSemaphore::radThreadSemaphore( unsigned int count )
 
 radThreadSemaphore::~radThreadSemaphore( void )
 {
+#if SDL_MAJOR_VERSION < 3
+    SDL_DestroySemaphore((SDL_sem*)m_Semaphore);
+#else
     SDL_DestroySemaphore(m_Semaphore);
+#endif
 }
 
 //=============================================================================
@@ -129,8 +135,12 @@ radThreadSemaphore::~radThreadSemaphore( void )
 //------------------------------------------------------------------------------
 
 void radThreadSemaphore::Wait( void )
-{ 
-    SDL_SemWait(m_Semaphore);
+{
+#if SDL_MAJOR_VERSION < 3
+    SDL_SemWait((SDL_sem*)m_Semaphore);
+#else
+    SDL_WaitSemaphore(m_Semaphore);
+#endif
 }
 
 //=============================================================================
@@ -146,8 +156,12 @@ void radThreadSemaphore::Wait( void )
 //------------------------------------------------------------------------------
 
 void radThreadSemaphore::Signal( void )
-{ 
-    SDL_SemPost(m_Semaphore);
+{
+#if SDL_MAJOR_VERSION < 3
+    SDL_SemPost((SDL_sem*)m_Semaphore);
+#else
+    SDL_SignalSemaphore(m_Semaphore);
+#endif
 }
 
 //=============================================================================

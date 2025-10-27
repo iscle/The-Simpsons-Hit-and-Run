@@ -30,6 +30,8 @@
 #include "system.hpp"
 #include "thread.hpp"
 
+#include <SDL.h>
+
 //=============================================================================
 // Local Definitions
 //=============================================================================
@@ -54,7 +56,7 @@ radThread* radThread::s_ThreadTable[ MAX_RADTHREADS ];
 // The following table are provided to map our priorities to OS specific 
 // priorities.
 //
-SDL_ThreadPriority radThread::s_PriorityMap[ PriorityHigh + 1 ] =
+static SDL_ThreadPriority s_PriorityMap[ radThread::PriorityHigh + 1 ] =
         { SDL_THREAD_PRIORITY_LOW, SDL_THREAD_PRIORITY_LOW, SDL_THREAD_PRIORITY_NORMAL,
           SDL_THREAD_PRIORITY_HIGH, SDL_THREAD_PRIORITY_HIGH };
 
@@ -559,7 +561,17 @@ radThread::radThread
     // Create thread which then sets its own priority.
     //
     m_Priority = priority;
+
+#if SDL_MAJOR_VERSION < 3
     m_ThreadHandle = SDL_CreateThreadWithStackSize(InternalThreadEntry, /*name*/nullptr, stackSize * 1024, this);
+#else
+    SDL_PropertiesID props = SDL_CreateProperties();
+    SDL_SetPointerProperty(props, SDL_PROP_THREAD_CREATE_ENTRY_FUNCTION_POINTER, (void*)InternalThreadEntry);
+    SDL_SetNumberProperty(props, SDL_PROP_THREAD_CREATE_STACKSIZE_NUMBER, (Sint64)(stackSize * 1024));
+    SDL_SetPointerProperty(props, SDL_PROP_THREAD_CREATE_USERDATA_POINTER, this);
+    m_ThreadHandle = SDL_CreateThreadWithProperties(props);
+    SDL_DestroyProperties(props);
+#endif
 
     //
     // Release our protection.
@@ -751,7 +763,11 @@ void radThread::SetPriority( Priority priority )
     //
     m_Priority = priority;
 
+#if SDL_MAJOR_VERSION < 3
     SDL_SetThreadPriority( s_PriorityMap[ priority ] );
+#else
+    SDL_SetCurrentThreadPriority( s_PriorityMap[ priority ] );
+#endif
 }
 
 //=============================================================================

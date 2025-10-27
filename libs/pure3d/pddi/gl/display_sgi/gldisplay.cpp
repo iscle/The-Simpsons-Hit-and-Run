@@ -291,14 +291,3 @@ pddiLockInfo*  pglSurface::Lock(pddiLockType l)
 void pglSurface::Unlock()
 {
 }
-
-unsigned pglDisplay::FillDisplayModes(pddiModeInfo* displayModes)
-{
-    int i = 0;
-    int nModes = 0;
-
-    return nModes;
-}
-    
-
-

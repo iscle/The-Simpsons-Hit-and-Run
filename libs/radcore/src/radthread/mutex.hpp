@@ -24,7 +24,6 @@
 // Include Files
 //=============================================================================
 
-#include <SDL.h>
 #include <radobject.hpp>
 #include <radmemory.hpp>
 #include <radthread.hpp>
@@ -32,6 +31,8 @@
 //=============================================================================
 // Forward Class Declarations
 //=============================================================================
+
+struct SDL_Mutex;
 
 //=============================================================================
 // Defintions
@@ -82,7 +83,7 @@ class radThreadMutex : public IRadThreadMutex,
     //
     unsigned int m_ReferenceCount;    
 
-    SDL_mutex* m_Mutex;
+    SDL_Mutex* m_Mutex;
 };
 
 #endif

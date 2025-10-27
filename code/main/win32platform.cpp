@@ -338,7 +338,11 @@ bool Win32Platform::InitializeWindow()
 #endif
     int w, h;
     TranslateResolution( StartingResolution, w, h );
+#if SDL_MAJOR_VERSION < 3
     mWnd = SDL_CreateWindow( ApplicationName, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags );
+#else
+    mWnd = SDL_CreateWindow( ApplicationName, w, h, flags );
+#endif
 
     rAssert(mWnd != NULL);
 
@@ -349,7 +353,9 @@ bool Win32Platform::InitializeWindow()
 
     ShowTheCursor( false );
 
+#if SDL_MAJOR_VERSION < 3
     SDL_GetWindowGammaRamp( mWnd, DesktopGammaRamp[0], DesktopGammaRamp[1], DesktopGammaRamp[2] );
+#endif
 
     SDL_DisableScreenSaver();
 
@@ -1798,7 +1804,14 @@ void Win32Platform::ShowTheCursor( bool show )
     if( mShowCursor != show )
     {        
         mShowCursor = show;
+#if SDL_MAJOR_VERSION < 3
         SDL_ShowCursor( mShowCursor ? SDL_ENABLE : SDL_DISABLE );
+#else
+        if( mShowCursor )
+            SDL_ShowCursor();
+        else
+            SDL_HideCursor();
+#endif
     }
 }
 
@@ -1818,13 +1831,22 @@ void Win32Platform::ShowTheCursor( bool show )
 // Notes:
 //=============================================================================
 
+#if SDL_MAJOR_VERSION < 3
 int SDLCALL Win32Platform::WndProc( void * userdata, SDL_Event * event )
+#else
+bool SDLCALL Win32Platform::WndProc( void * userdata, SDL_Event * event )
+#endif
 {
     SDL_Window * wnd = (SDL_Window *)userdata;
 
     switch(event->type)
     {
+#if SDL_MAJOR_VERSION < 3
     case SDL_WINDOWEVENT: // WM_ACTIVATEAPP
+#else
+    default: // WM_ACTIVATEAPP
+        if( event->type >= SDL_EVENT_WINDOW_FIRST && event->type <= SDL_EVENT_WINDOW_LAST )
+#endif
         {
             //
             // Under Win32, Pure3D needs to get a crack at the Windows messages so
@@ -1832,11 +1854,11 @@ int SDLCALL Win32Platform::WndProc( void * userdata, SDL_Event * event )
             //
             p3d::platform->ProcessWindowsMessage( wnd, &event->window );
 
-            InputManager* pInputManager = GetInputManager();
-
             if( spInstance != NULL && spInstance->mpContext != NULL )
             {
-                switch(event->window.event)
+                InputManager* pInputManager = GetInputManager();
+#if SDL_MAJOR_VERSION < 3
+                switch( event->window.event )
                 {
                 case SDL_WINDOWEVENT_FOCUS_GAINED: // Window is being shown (in focus)
                     {
@@ -1871,16 +1893,58 @@ int SDLCALL Win32Platform::WndProc( void * userdata, SDL_Event * event )
                 }
 
                 ShowTheCursor( event->window.event == SDL_WINDOWEVENT_FOCUS_LOST );
+#else
+                switch( event->window.type )
+                {
+                case SDL_EVENT_WINDOW_FOCUS_GAINED: // Window is being shown (in focus)
+                    {
+                        RenderFlow* rf = GetRenderFlow();
+
+                        rf->SetGamma( rf->GetGamma() );
+                        if( pInputManager )
+                        {
+                            //GetInputManager()->SetRumbleForDevice(0, true);
+                            //rDebugPrintf("Force Effects Started!!! \n");
+                        }
+                    }
+                    SDL_HideCursor();
+                    break;
+
+                case SDL_EVENT_WINDOW_FOCUS_LOST:  // Window is being hidden (not in focus)
+                    if( pInputManager )
+                    {
+                        //GetInputManager()->SetRumbleForDevice(0, false);
+                        //rDebugPrintf("Force Effects Stopped!!! \n");
+                    }
+                    SDL_ShowCursor();
+                    break;
+
+#ifdef RAD_PC
+                case SDL_EVENT_WINDOW_LEAVE:
+                    GetInputManager()->GetFEMouse()->getCursor()->SetVisible( false );
+                    break;
+#endif
+                }
+#endif
             }
 
             break;
         }
 
+#if SDL_MAJOR_VERSION < 3
     case SDL_KEYDOWN: // WM_SYSKEYDOWN
     case SDL_KEYUP:   // WM_SYSKEYUP
+#else
+    case SDL_EVENT_KEY_DOWN: // WM_SYSKEYDOWN
+    case SDL_EVENT_KEY_UP:   // WM_SYSKEYUP
+#endif
         {
             //Ignore Alt and F10 keys.
-            switch(event->key.keysym.sym) 
+#if SDL_MAJOR_VERSION < 3
+            switch( event->key.keysym.sym )
+#else
+            switch( event->key.key )
+#endif
             {
             case SDLK_LALT:
             case SDLK_RALT:
@@ -1891,7 +1955,11 @@ int SDLCALL Win32Platform::WndProc( void * userdata, SDL_Event * event )
             }
         }
 
-    case SDL_MOUSEMOTION:  
+#if SDL_MAJOR_VERSION < 3
+    case SDL_MOUSEMOTION:
+#else
+    case SDL_EVENT_MOUSE_MOTION:
+#endif
         {
 #ifdef RAD_PC
             // For some reason beyond my comprehension WM_MOUSEMOVE seems to be getting called regardless if the
@@ -1930,9 +1998,6 @@ int SDLCALL Win32Platform::WndProc( void * userdata, SDL_Event * event )
         // regains focus, WM_PDDI_DRAW_ENABLE(1) will be sent.
     //case WM_PDDI_DRAW_ENABLE:
         //GetApplication()->EnableRendering(wParam == 1);
-        break;
-
-    default:
         break;
     }
 

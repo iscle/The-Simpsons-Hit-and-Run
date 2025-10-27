@@ -24,8 +24,6 @@
 // Include Files
 //=============================================================================
 
-#include <SDL.h>
-
 #include <radobject.hpp>
 #include <radmemory.hpp>
 #include <radthread.hpp>
@@ -33,6 +31,8 @@
 //=============================================================================
 // Forward Class Declarations
 //=============================================================================
+
+struct SDL_Semaphore;
 
 //=============================================================================
 // Defintions
@@ -83,7 +83,7 @@ class radThreadSemaphore : public IRadThreadSemaphore,
     //
     unsigned int m_ReferenceCount;    
 
-    SDL_sem* m_Semaphore;
+    SDL_Semaphore* m_Semaphore;
 };
 
 #endif

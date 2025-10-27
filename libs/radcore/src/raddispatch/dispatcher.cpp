@@ -29,6 +29,8 @@
 #include <raddebug.hpp>
 #include <radmemorymonitor.hpp>
 
+#include <SDL.h>
+
 #include "dispatcher.hpp"
 
 //=============================================================================
@@ -98,7 +100,7 @@ radDispatcher::radDispatcher
     //
     m_EventQueue = (Event*) radMemoryAlloc( alloc, sizeof(Event) * m_MaxEvents );
 
-    m_Mutex = SDL_CreateMutex();
+    m_Mutex = (SDL_Mutex*) SDL_CreateMutex();
 }
 
 //=============================================================================
@@ -119,8 +121,12 @@ radDispatcher::~radDispatcher( void )
     // If this asserts the caller did not call purge.
     //
     rAssert( m_EventsQueued == 0 );
-   
-    SDL_DestroyMutex(m_Mutex);
+
+#if SDL_MAJOR_VERSION < 3
+    SDL_DestroyMutex( (SDL_mutex*)m_Mutex );
+#else
+    SDL_DestroyMutex( m_Mutex );
+#endif
 
     //
     // Free up the memory
@@ -219,7 +225,11 @@ void radDispatcher::QueueCallback
 
     //
     // Protect the addition of this record to the event list.
-    SDL_LockMutex(m_Mutex);
+#if SDL_MAJOR_VERSION < 3
+    SDL_LockMutex( (SDL_mutex*)m_Mutex );
+#else
+    SDL_LockMutex( m_Mutex );
+#endif
 
     //
     // Assert that we have not exceeded the maximum number of events in the queue.
@@ -241,7 +251,11 @@ void radDispatcher::QueueCallback
     //
     // Remove protection
     //
-    SDL_UnlockMutex(m_Mutex);
+#if SDL_MAJOR_VERSION < 3
+    SDL_UnlockMutex( (SDL_mutex*)m_Mutex );
+#else
+    SDL_UnlockMutex( m_Mutex );
+#endif
 }
 
 
@@ -342,7 +356,11 @@ unsigned int radDispatcher::Service( void )
     // Protect the manilpulation of this record the event list. Platform specif locks
     // required.
     //
-    SDL_LockMutex(m_Mutex);
+#if SDL_MAJOR_VERSION < 3
+    SDL_LockMutex( (SDL_mutex*)m_Mutex );
+#else
+    SDL_LockMutex( m_Mutex );
+#endif
 
     while( (m_EventsQueued != 0) && (eventsToDispatch != 0) )
     {
@@ -361,7 +379,11 @@ unsigned int radDispatcher::Service( void )
         //
         // Now remove lock and invoke event handler.
         //
-        SDL_UnlockMutex(m_Mutex);
+#if SDL_MAJOR_VERSION < 3
+        SDL_UnlockMutex( (SDL_mutex*)m_Mutex );
+#else
+        SDL_UnlockMutex( m_Mutex );
+#endif
 
         event.m_Callback->OnDispatchCallack( event.m_UserData );
 
@@ -378,10 +400,18 @@ unsigned int radDispatcher::Service( void )
         RotateThreadReadyQueue( threadInfo.currentPriority );
         #endif
 
-        SDL_LockMutex(m_Mutex);
+#if SDL_MAJOR_VERSION < 3
+        SDL_LockMutex( (SDL_mutex*)m_Mutex );
+#else
+        SDL_LockMutex( m_Mutex );
+#endif
     }
 
-    SDL_UnlockMutex(m_Mutex);
+#if SDL_MAJOR_VERSION < 3
+    SDL_UnlockMutex( (SDL_mutex*)m_Mutex );
+#else
+    SDL_UnlockMutex( m_Mutex );
+#endif
 
     return( m_EventsQueued );
           

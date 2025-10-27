@@ -24,7 +24,15 @@ if(CCACHE_FOUND)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
 endif()
 
-find_package(SDL2 REQUIRED)
+find_package(SDL3)
+if(SDL3_FOUND)
+	get_target_property(SDL_INCLUDE_DIR SDL3::Headers INTERFACE_INCLUDE_DIRECTORIES)
+	target_include_directories(SDL3::Headers INTERFACE ${SDL_INCLUDE_DIR}/SDL3)
+	set(SDL_LIBRARY SDL3::SDL3)
+else()
+	find_package(SDL2 REQUIRED)
+	set(SDL_LIBRARY SDL2::SDL2 SDL2::SDL2main)
+endif()
 find_package(PNG REQUIRED)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
@@ -1204,7 +1212,7 @@ target_include_directories(radcore
 	PUBLIC "code/" # wtf (radobject.hpp includes memory/classsizetracker.h)
 )
 target_compile_features(radcore PUBLIC cxx_std_17)
-target_link_libraries(radcore SDL2::SDL2)
+target_link_libraries(radcore ${SDL_LIBRARY})
 
 add_library(radcontent STATIC ${RADCONTENT_SOURCES})
 target_include_directories(radcontent
@@ -1240,7 +1248,7 @@ if(SRR2_P3D_CG)
 	target_link_libraries(pddi cg cgGL)
 endif()
 target_link_libraries(pddi
-	SDL2::SDL2
+	${SDL_LIBRARY}
 	radmath
 	radcore
 )
@@ -1308,7 +1316,7 @@ if(SRR2_BUILD_TESTS)
 		"code/main/tuidunaligned.cpp")
 	target_link_libraries(simplemovie
 		radmovie
-		SDL2::SDL2
+		${SDL_LIBRARY}
 		p3d
 		pddi
 		radcore
@@ -1436,8 +1444,7 @@ endif()
 
 add_executable(${PROJECT_NAME} ${SRR2_SOURCES})
 target_link_libraries(${PROJECT_NAME}
-	SDL2::SDL2
-	SDL2::SDL2main
+	${SDL_LIBRARY}
 	choreo
 	p3d
 	pddi

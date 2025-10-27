@@ -61,8 +61,6 @@ public:
     bool CheckExtension(const char*);
     bool HasReset(void) { return reset; }
 
-    static unsigned FillDisplayModes(int, pddiModeInfo*);
-
     void SetGamma(float r, float g, float b);
     void GetGamma(float* r, float* g, float* b);
 

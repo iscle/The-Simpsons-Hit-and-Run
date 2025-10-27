@@ -26,7 +26,7 @@ static gxmDevice gblDevice;
 char libName [] = "GXM";
 
 #ifdef PDDI_USE_ASSERTS
-
+#include <raddebug.hpp>
 const char* pddiGxmErrorString(unsigned int err)
 {
     switch(err)
@@ -127,29 +127,69 @@ int gxmDevice::GetDisplayInfo(pddiDisplayInfo** info)
         return nDisplays;
     }
 
+#if SDL_MAJOR_VERSION < 3
     int totalDisplay = SDL_GetNumVideoDisplays();
+#else
+    int totalDisplay;
+    SDL_DisplayID* displayIds = SDL_GetDisplays(&totalDisplay);
+#endif
     displayInfo = new pddiDisplayInfo[totalDisplay];
 
     nDisplays = 0;
     for(int i = 0; i < totalDisplay; i++)
     {
+#if SDL_MAJOR_VERSION < 3
+        SDL_DisplayMode devMode;
         const char* displayName = SDL_GetDisplayName(i);
         int totalModes = SDL_GetNumDisplayModes(i);
         if (!displayName || totalModes <= 0)
             continue;
+#else
+        const char* displayName = SDL_GetDisplayName(displayIds[i]);
+        int totalModes;
+        SDL_DisplayMode** modes = SDL_GetFullscreenDisplayModes(displayIds[i], &totalModes);
+        if (!displayName || !modes)
+            continue;
+#endif
 
         displayInfo[nDisplays].id = i;
-        strcpy(displayInfo[0].description,SDL_GetDisplayName(i));
+        strcpy(displayInfo[0].description, displayName);
         displayInfo[nDisplays].pci = 0;
         displayInfo[nDisplays].vendor = 0;
         displayInfo[nDisplays].fullscreenOnly = false;
         displayInfo[nDisplays].caps = 0;
 
-        displayInfo[nDisplays].modeInfo = new pddiModeInfo[totalModes];
-        displayInfo[nDisplays].nDisplayModes = gxmDisplay::FillDisplayModes(i, displayInfo[nDisplays].modeInfo);
-        displayInfo[nDisplays].modeInfo = displayInfo[nDisplays].modeInfo;
+        int nModes = 0;
+        pddiModeInfo* displayModes = new pddiModeInfo[totalModes];
+#if SDL_MAJOR_VERSION < 3
+        for(int j = 0; j < totalModes; j++)
+        {
+            if(SDL_GetDisplayMode(j, j, &devMode) == 0)
+            {
+                displayModes[nModes].width = devMode.w;
+                displayModes[nModes].height = devMode.h;
+                displayModes[nModes].bpp = 32;
+                nModes++;
+            }
+        }
+#else
+        for(int j = 0; j < totalModes; j++)
+        {
+            displayModes[nModes].width = modes[j]->w;
+            displayModes[nModes].height = modes[j]->h;
+            displayModes[nModes].bpp = 32;
+            nModes++;
+        }
+        SDL_free(modes);
+#endif
+
+        displayInfo[nDisplays].modeInfo = displayModes;
+        displayInfo[nDisplays].nDisplayModes = nModes;
         nDisplays++;
     }
+#if SDL_MAJOR_VERSION > 2
+    SDL_free(displayIds);
+#endif
 
     return nDisplays;
 }

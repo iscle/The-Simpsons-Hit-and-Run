@@ -136,7 +136,11 @@ private:
     // Windows methods.
     void ResizeWindow();
     static void ShowTheCursor( bool show );
+#if SDL_MAJOR_VERSION < 3
     static int SDLCALL WndProc( void* userdata, SDL_Event* msg );
+#else
+    static bool SDLCALL WndProc( void* userdata, SDL_Event* msg );
+#endif
 
 private:
 

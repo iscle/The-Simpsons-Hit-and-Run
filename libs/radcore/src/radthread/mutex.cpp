@@ -29,6 +29,8 @@
 #include "mutex.hpp"
 #include "system.hpp"
 
+#include <SDL.h>
+
 //=============================================================================
 // Local Definitions
 //=============================================================================
@@ -90,7 +92,11 @@ radThreadMutex::radThreadMutex( void )
     m_ReferenceCount( 1 )
 { 
     radMemoryMonitorIdentifyAllocation( this, g_nameFTech, "radThreadMutex" );
+#if SDL_MAJOR_VERSION < 3
+    m_Mutex = (SDL_Mutex*)SDL_CreateMutex();
+#else
     m_Mutex = SDL_CreateMutex();
+#endif
 }
 
 //=============================================================================
@@ -108,7 +114,11 @@ radThreadMutex::radThreadMutex( void )
 
 radThreadMutex::~radThreadMutex( void )
 {
+#if SDL_MAJOR_VERSION < 3
+    SDL_DestroyMutex((SDL_mutex*)m_Mutex);
+#else
     SDL_DestroyMutex(m_Mutex);
+#endif
 }
 
 //=============================================================================
@@ -126,8 +136,12 @@ radThreadMutex::~radThreadMutex( void )
 //------------------------------------------------------------------------------
 
 void radThreadMutex::Lock( void )
-{ 
+{
+#if SDL_MAJOR_VERSION < 3
+    SDL_LockMutex((SDL_mutex*)m_Mutex);
+#else
     SDL_LockMutex(m_Mutex);
+#endif
 }
 
 //=============================================================================
@@ -143,8 +157,12 @@ void radThreadMutex::Lock( void )
 //------------------------------------------------------------------------------
 
 void radThreadMutex::Unlock( void )
-{ 
+{
+#if SDL_MAJOR_VERSION < 3
+    SDL_UnlockMutex((SDL_mutex*)m_Mutex);
+#else
     SDL_UnlockMutex(m_Mutex);
+#endif
 }
 
 //=============================================================================
