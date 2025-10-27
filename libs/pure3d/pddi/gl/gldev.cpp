@@ -14,7 +14,7 @@
 #include <stdlib.h>
 // #include <io.h>
 #include <pddi/base/debug.hpp>
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #define PDDI_GL_BUILD 36
 
@@ -76,30 +76,38 @@ int pglDevice::GetDisplayInfo(pddiDisplayInfo** info)
         return nDisplays;
     }
 
-    int totalDisplay = SDL_GetNumVideoDisplays();
+    int totalDisplay;
+    SDL_DisplayID* displays = SDL_GetDisplays(&totalDisplay);
     displayInfo = new pddiDisplayInfo[totalDisplay];
 
     nDisplays = 0;
     for(int i = 0; i < totalDisplay; i++)
     {
-        const char* displayName = SDL_GetDisplayName(i);
-        int totalModes = SDL_GetNumDisplayModes(i);
-        if (!displayName || totalModes <= 0)
+        SDL_DisplayID displayID = displays[i];
+        const char* displayName = SDL_GetDisplayName(displayID);
+
+        const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(displayID);
+        if (!displayName || !mode) {
             continue;
+        }
 
         displayInfo[nDisplays].id = i;
-        strcpy(displayInfo[0].description,SDL_GetDisplayName(i));
+        strcpy(displayInfo[0].description,displayName);
         displayInfo[nDisplays].pci = 0;
         displayInfo[nDisplays].vendor = 0;
         displayInfo[nDisplays].fullscreenOnly = false;
         displayInfo[nDisplays].caps = 0;
 
-        displayInfo[nDisplays].modeInfo = new pddiModeInfo[totalModes];
-        displayInfo[nDisplays].nDisplayModes = pglDisplay::FillDisplayModes(i, displayInfo[nDisplays].modeInfo);
-        displayInfo[nDisplays].modeInfo = displayInfo[nDisplays].modeInfo;
+        displayInfo[nDisplays].modeInfo = new pddiModeInfo[1];
+        displayInfo[nDisplays].nDisplayModes = 1;
+        displayInfo[nDisplays].modeInfo[0].width = mode->w;
+        displayInfo[nDisplays].modeInfo[0].height = mode->h;
+        const SDL_PixelFormatDetails* formatDetails = SDL_GetPixelFormatDetails(mode->format);
+        displayInfo[nDisplays].modeInfo[0].bpp = (formatDetails->bits_per_pixel > 0) ? formatDetails->bits_per_pixel : 32; // fallback if unknown
         nDisplays++;
     }
 
+    SDL_free(displays);
     return nDisplays;
 }
 

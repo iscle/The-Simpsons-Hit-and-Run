@@ -30,7 +30,7 @@
 #include <radobjectlist.hpp>
 
 #ifdef RAD_WIN32
-#include <SDL.h>
+#include <SDL3/SDL.h>
 #ifdef WIN32
 #include <windows.h>
 #include <SDL_syswm.h>
@@ -119,7 +119,7 @@ class radPlatform : public IRadPlatform
     //
     // Windows specific interfaces.
     //
-    static int SDLCALL MainWindowProcedure
+    static bool SDLCALL MainWindowProcedure
     (
         void* userdata, SDL_Event* event
     );
@@ -174,7 +174,7 @@ class radPlatform : public IRadPlatform
     {
         rAssert( pICallback != NULL );
 
-        SDL_DelEventWatch( MainWindowProcedure, pICallback );
+        SDL_RemoveEventWatch( MainWindowProcedure, pICallback );
     }
 
     private:    
@@ -543,7 +543,7 @@ void radPlatformInitialize( SDL_Window* pMainWindow, radMemoryAllocator allocato
     pthePlatform->Initialize( pMainWindow, allocator );
 }
 
-int SDLCALL radPlatform::MainWindowProcedure
+bool SDLCALL radPlatform::MainWindowProcedure
 (
     void* userdata, SDL_Event* event
 )
@@ -554,7 +554,7 @@ int SDLCALL radPlatform::MainWindowProcedure
 
     callback->OnWindowMessage( pThis->m_pMainWindow, event );
 
-    return 0;
+    return false;
 }
 
 #endif

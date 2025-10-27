@@ -13,7 +13,7 @@
 //========================================
 // System Includes
 //========================================
-#include <SDL.h>
+#include <SDL3/SDL.h>
 // Standard Lib
 #include <stdlib.h>
 #include <string.h>
@@ -149,7 +149,6 @@ SDL_Window* Win32Platform::mWnd = NULL;
 #include <Windows.h>
 void* Win32Platform::mhMutex = NULL;
 #endif
-bool Win32Platform::mShowCursor = true;
 
 //The Adlib font.  <sigh>
 unsigned char gFont[] = 
@@ -334,7 +333,7 @@ bool Win32Platform::InitializeWindow()
 #endif
     int w, h;
     TranslateResolution( StartingResolution, w, h );
-    mWnd = SDL_CreateWindow( ApplicationName, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags );
+    mWnd = SDL_CreateWindow( ApplicationName, w, h, flags );
 
     rAssert(mWnd != NULL);
 
@@ -345,7 +344,7 @@ bool Win32Platform::InitializeWindow()
 
     ShowTheCursor( false );
 
-    SDL_GetWindowGammaRamp( mWnd, DesktopGammaRamp[0], DesktopGammaRamp[1], DesktopGammaRamp[2] );
+//    SDL_GetWindowGammaRamp( mWnd, DesktopGammaRamp[0], DesktopGammaRamp[1], DesktopGammaRamp[2] );
 
     SDL_DisableScreenSaver();
 
@@ -1791,10 +1790,12 @@ void Win32Platform::ResizeWindow()
 
 void Win32Platform::ShowTheCursor( bool show )
 {
-    if( mShowCursor != show )
+    if( SDL_CursorVisible() != show )
     {        
-        mShowCursor = show;
-        SDL_ShowCursor( mShowCursor ? SDL_ENABLE : SDL_DISABLE );
+        if ( show )
+            SDL_ShowCursor();
+        else
+            SDL_HideCursor();
     }
 }
 
@@ -1814,83 +1815,76 @@ void Win32Platform::ShowTheCursor( bool show )
 // Notes:
 //=============================================================================
 
-int SDLCALL Win32Platform::WndProc( void * userdata, SDL_Event * event )
+bool SDLCALL Win32Platform::WndProc( void * userdata, SDL_Event * event )
 {
     SDL_Window * wnd = (SDL_Window *)userdata;
 
-    switch(event->type)
+    if (event->type >= SDL_EVENT_WINDOW_FIRST && event->type <= SDL_EVENT_WINDOW_LAST)
     {
-    case SDL_WINDOWEVENT: // WM_ACTIVATEAPP
+        //
+        // Under Win32, Pure3D needs to get a crack at the Windows messages so
+        // it can detect window moving, resizing, and activation.
+        //
+        p3d::platform->ProcessWindowsMessage( wnd, &event->window );
+
+        if( spInstance != NULL && spInstance->mpContext != NULL )
         {
-            //
-            // Under Win32, Pure3D needs to get a crack at the Windows messages so
-            // it can detect window moving, resizing, and activation.
-            //
-            p3d::platform->ProcessWindowsMessage( wnd, &event->window );
-
-            InputManager* pInputManager = GetInputManager();
-
-            if( spInstance != NULL && spInstance->mpContext != NULL )
+            switch(event->type)
             {
-                switch(event->window.event)
+                case SDL_EVENT_WINDOW_FOCUS_GAINED: // Window is being shown (in focus)
                 {
-                case SDL_WINDOWEVENT_FOCUS_GAINED: // Window is being shown (in focus)
-                    {
-                        RenderFlow* rf = GetRenderFlow();
+                    RenderFlow* rf = GetRenderFlow();
 
-                        rf->SetGamma( rf->GetGamma() );
-                        if( pInputManager )
-                        {
-                            //GetInputManager()->SetRumbleForDevice(0, true);
-                            //rDebugPrintf("Force Effects Started!!! \n");
-                        }
-                    }
+                    rf->SetGamma( rf->GetGamma() );
+
+                    //GetInputManager()->SetRumbleForDevice(0, true);
+                    //rDebugPrintf("Force Effects Started!!! \n");
+                }
                     break;
 
-                case SDL_WINDOWEVENT_FOCUS_LOST:  // Window is being hidden (not in focus)
-                    SDL_SetWindowGammaRamp( wnd,
-                        DesktopGammaRamp[0],
-                        DesktopGammaRamp[1],
-                        DesktopGammaRamp[2] );
-                    if( pInputManager )
-                    {
-                        //GetInputManager()->SetRumbleForDevice(0, false);
-                        //rDebugPrintf("Force Effects Stopped!!! \n");
-                    }
+                case SDL_EVENT_WINDOW_FOCUS_LOST:  // Window is being hidden (not in focus)
+//                    SDL_SetWindowGammaRamp( wnd,
+//                        DesktopGammaRamp[0],
+//                        DesktopGammaRamp[1],
+//                        DesktopGammaRamp[2] );
+
+                    //GetInputManager()->SetRumbleForDevice(0, false);
+                    //rDebugPrintf("Force Effects Stopped!!! \n");
                     break;
 
 #ifdef RAD_PC
-                case SDL_WINDOWEVENT_LEAVE:
+                    case SDL_WINDOWEVENT_LEAVE:
                     GetInputManager()->GetFEMouse()->getCursor()->SetVisible( false );
                     break;
 #endif
-                }
-
-                ShowTheCursor( event->window.event == SDL_WINDOWEVENT_FOCUS_LOST );
             }
 
-            break;
+            ShowTheCursor( event->window.type == SDL_EVENT_WINDOW_FOCUS_LOST );
         }
-
-    case SDL_KEYDOWN: // WM_SYSKEYDOWN
-    case SDL_KEYUP:   // WM_SYSKEYUP
+    }
+    else
+    {
+        switch(event->type)
         {
-            //Ignore Alt and F10 keys.
-            switch(event->key.keysym.sym) 
+            case SDL_EVENT_KEY_DOWN: // WM_SYSKEYDOWN
+            case SDL_EVENT_KEY_UP:   // WM_SYSKEYUP
             {
-            case SDLK_LALT:
-            case SDLK_RALT:
-            	return 0;
-            case SDLK_F10:
-            	return 0;
-            default: break;
+                //Ignore Alt and F10 keys.
+                switch(event->key.key)
+                {
+                case SDLK_LALT:
+                case SDLK_RALT:
+                    return false;
+                case SDLK_F10:
+                    return false;
+                default: break;
+                }
             }
-        }
 
-    case SDL_MOUSEMOTION:  
-        {
+            case SDL_EVENT_MOUSE_MOTION:
+            {
 #ifdef RAD_PC
-            // For some reason beyond my comprehension WM_MOUSEMOVE seems to be getting called regardless if the
+                // For some reason beyond my comprehension WM_MOUSEMOVE seems to be getting called regardless if the
             // mouse moved or not. So let the FEMouse determine if we moved.
             FEMouse* pFEMouse = GetInputManager()->GetFEMouse();
             if( pFEMouse->DidWeMove( event->motion.x, event->motion.y ) )
@@ -1901,37 +1895,38 @@ int SDLCALL Win32Platform::WndProc( void * userdata, SDL_Event * event )
             }
 #endif
 
-            ShowTheCursor( false );
+                ShowTheCursor( false );
 
-            break;
-        }
+                break;
+            }
 
 #ifdef RAD_PC
-    case SDL_MOUSEBUTTONDOWN:
-        if (event->button.button == SDL_BUTTON_LEFT)
-            GetInputManager()->GetFEMouse()->ButtonDown( BUTTON_LEFT );
-    //        rDebugPrintf("LEFT MOUSE BUTTON PRESSED!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n");
-        break;
+                case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                    if (event->button.button == SDL_BUTTON_LEFT)
+                        GetInputManager()->GetFEMouse()->ButtonDown( BUTTON_LEFT );
+                //        rDebugPrintf("LEFT MOUSE BUTTON PRESSED!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n");
+                    break;
 
-    case SDL_MOUSEBUTTONUP:
-        if(event->button.button == SDL_BUTTON_LEFT)
-            GetInputManager()->GetFEMouse()->ButtonUp( BUTTON_LEFT );
-        break;
+                case SDL_EVENT_MOUSE_BUTTON_UP:
+                    if(event->button.button == SDL_BUTTON_LEFT)
+                        GetInputManager()->GetFEMouse()->ButtonUp( BUTTON_LEFT );
+                    break;
 #endif
 
-        // PDDI will sent this message to enable or disable rendering in response to an
-        // application level window event.  For example, if the user clicks away from
-        // the rendering window, or uses ALT-TAB to select another application, PDDI
-        // will tell sent a WM_PDDI_DRAW_ENABLE(0) message.  When the application
-        // regains focus, WM_PDDI_DRAW_ENABLE(1) will be sent.
-    //case WM_PDDI_DRAW_ENABLE:
-        //GetApplication()->EnableRendering(wParam == 1);
-        break;
+                // PDDI will sent this message to enable or disable rendering in response to an
+                // application level window event.  For example, if the user clicks away from
+                // the rendering window, or uses ALT-TAB to select another application, PDDI
+                // will tell sent a WM_PDDI_DRAW_ENABLE(0) message.  When the application
+                // regains focus, WM_PDDI_DRAW_ENABLE(1) will be sent.
+                //case WM_PDDI_DRAW_ENABLE:
+                //GetApplication()->EnableRendering(wParam == 1);
+                break;
 
-    default:
-        break;
+            default:
+                break;
+        }
     }
 
-    return 1;
+    return true;
 }
 

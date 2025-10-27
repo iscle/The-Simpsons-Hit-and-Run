@@ -15,7 +15,7 @@
 
 #include <math.h>
 #include <stdio.h>
-#include <SDL.h>
+#include <SDL3/SDL.h>
 #include <SDL_syswm.h>
 
 D3DFORMAT colourFormatTable[2][4] = {

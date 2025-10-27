@@ -559,7 +559,13 @@ radThread::radThread
     // Create thread which then sets its own priority.
     //
     m_Priority = priority;
-    m_ThreadHandle = SDL_CreateThreadWithStackSize(InternalThreadEntry, /*name*/nullptr, stackSize * 1024, this);
+
+    SDL_PropertiesID props = SDL_CreateProperties();
+    SDL_SetPointerProperty(props, SDL_PROP_THREAD_CREATE_ENTRY_FUNCTION_POINTER, (void*)InternalThreadEntry);
+    SDL_SetNumberProperty(props, SDL_PROP_THREAD_CREATE_STACKSIZE_NUMBER, (Sint64)(stackSize * 1024));
+    SDL_SetPointerProperty(props, SDL_PROP_THREAD_CREATE_USERDATA_POINTER, this);
+    m_ThreadHandle = SDL_CreateThreadWithProperties(props);
+    SDL_DestroyProperties(props);
 
     //
     // Release our protection.
@@ -751,7 +757,7 @@ void radThread::SetPriority( Priority priority )
     //
     m_Priority = priority;
 
-    SDL_SetThreadPriority( s_PriorityMap[ priority ] );
+    SDL_SetCurrentThreadPriority( s_PriorityMap[ priority ] );
 }
 
 //=============================================================================

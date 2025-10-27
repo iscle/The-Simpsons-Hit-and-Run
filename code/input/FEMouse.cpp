@@ -6,7 +6,7 @@
 #include <contexts/contextenum.h>
 #include <contexts/gameplay/gameplaycontext.h>
 #include <main/win32platform.h>
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #ifdef ENABLE_DYNA_LOADED_IMAGES
 const char* DYNAMIC_RESOURCES_DIR = "art\\frontend\\dynaload\\images\\";

@@ -15,7 +15,7 @@
 //===========================================================================
 // Includes
 //===========================================================================
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include <presentation/gui/ingame/guiscreenrewards.h>
 #include <presentation/gui/guimenu.h>

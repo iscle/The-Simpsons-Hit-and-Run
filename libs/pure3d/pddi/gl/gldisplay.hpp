@@ -9,7 +9,7 @@
 
 class pglContext;
 class pglWrapper;
-struct SDL_mutex;
+struct SDL_Mutex;
 
 class pglDisplay : public pddiDisplay
 {
@@ -52,8 +52,6 @@ public:
 #endif
     bool CheckExtension(const char*);
     bool HasReset(void) { return reset; }
-
-    static unsigned FillDisplayModes(int, pddiModeInfo*);
 
     void BeginContext(void);
     void EndContext(void);

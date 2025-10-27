@@ -130,7 +130,7 @@ radThreadSemaphore::~radThreadSemaphore( void )
 
 void radThreadSemaphore::Wait( void )
 { 
-    SDL_SemWait(m_Semaphore);
+    SDL_WaitSemaphore(m_Semaphore);
 }
 
 //=============================================================================
@@ -146,8 +146,8 @@ void radThreadSemaphore::Wait( void )
 //------------------------------------------------------------------------------
 
 void radThreadSemaphore::Signal( void )
-{ 
-    SDL_SemPost(m_Semaphore);
+{
+    SDL_SignalSemaphore(m_Semaphore);
 }
 
 //=============================================================================

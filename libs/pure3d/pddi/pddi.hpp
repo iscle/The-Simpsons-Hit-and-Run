@@ -36,6 +36,7 @@ struct pddiLockInfo;
 struct SDL_Window;
 struct SDL_WindowEvent;
 
+#include <SDL3/SDL.h>
 #include <pddi/pdditype.hpp>
 #include <pddi/pddienum.hpp>
 #include <pddi/pddishade.hpp>
@@ -87,7 +88,7 @@ typedef struct
 class pddiDisplayInfo
 {
 public:
-     int id;
+     SDL_DisplayID id;
      char description[256];
      unsigned pci;
      unsigned vendor;

@@ -16,7 +16,7 @@
 #include <string.h>
 // Foundation Tech
 #include <raddebug.hpp>
-#include <SDL.h>
+#include <SDL3/SDL.h>
 #define strupr SDL_strupr
 
 //========================================

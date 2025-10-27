@@ -26,7 +26,7 @@
 // Include Files
 //=============================================================================
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 
 #include <raddispatch.hpp>
@@ -107,7 +107,7 @@ class radDispatcher : public IRadDispatcher,
     unsigned int        m_EventQueueTailIndex;
     unsigned int        m_EventsQueued;
 
-    SDL_mutex*		m_Mutex;
+    SDL_Mutex*		m_Mutex;
 };
 
 #endif

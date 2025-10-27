@@ -6,7 +6,7 @@
 #include <pddi/gl/glcon.hpp>
 #include <pddi/gl/gldisplay.hpp>
 #include <pddi/base/debug.hpp>
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include<stdio.h>
 #include<string.h>
@@ -14,7 +14,7 @@
 
 bool pglDisplay::CheckExtension( const char *extName )
 {
-    return SDL_GL_ExtensionSupported(extName) == SDL_TRUE;
+    return SDL_GL_ExtensionSupported(extName);
 }
 
 pglDisplay ::pglDisplay(pddiDisplayInfo* info)
@@ -171,7 +171,7 @@ bool pglDisplay ::InitDisplay(const pddiDisplayInit* init)
     else
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
 #ifndef RAD_VITA
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, SDL_TRUE);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, true);
 #ifdef RAD_DEBUG
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 #endif
@@ -344,27 +344,6 @@ unsigned pglDisplay::Screenshot(pddiColour* buffer, int nBytes)
 
     return winHeight * winWidth * 4;
 }
-
-unsigned pglDisplay::FillDisplayModes(int displayIndex, pddiModeInfo* displayModes)
-{
-    int nModes = 0;
-
-    SDL_DisplayMode devMode;
-
-    for (int i = 0; i < SDL_GetNumDisplayModes(displayIndex); i++)
-    {
-        if(SDL_GetDisplayMode(displayIndex, i, &devMode) == 0)
-        {
-            displayModes[nModes].width = devMode.w;
-            displayModes[nModes].height = devMode.h;
-            displayModes[nModes].bpp = 32;
-            nModes++;
-        }
-    }
-
-    return nModes;
-}
-    
   
 void pglDisplay::BeginTiming()
 {

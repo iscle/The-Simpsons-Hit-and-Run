@@ -6,7 +6,7 @@
 #include <pddi/gl/glcon.hpp>
 #include <pddi/gl/gldisplay.hpp>
 #include <pddi/base/debug.hpp>
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include<stdio.h>
 #include<string.h>
@@ -14,7 +14,7 @@
 
 bool pglDisplay::CheckExtension( const char *extName )
 {
-    return SDL_GL_ExtensionSupported(extName) == SDL_TRUE;
+    return SDL_GL_ExtensionSupported(extName);
 }
 
 pglDisplay ::pglDisplay(pddiDisplayInfo* info)
@@ -191,27 +191,6 @@ unsigned pglDisplay::Screenshot(pddiColour* buffer, int nBytes)
     assert( 0 && "PDDI: pddiDisplay::ScreenShot() - Not implemented under vita." );
     return 0;
 }
-
-unsigned pglDisplay::FillDisplayModes(int displayIndex, pddiModeInfo* displayModes)
-{
-    int nModes = 0;
-
-    SDL_DisplayMode devMode;
-
-    for (int i = 0; i < SDL_GetNumDisplayModes(displayIndex); i++)
-    {
-        if(SDL_GetDisplayMode(displayIndex, i, &devMode) == 0)
-        {
-            displayModes[nModes].width = devMode.w;
-            displayModes[nModes].height = devMode.h;
-            displayModes[nModes].bpp = 32;
-            nModes++;
-        }
-    }
-
-    return nModes;
-}
-    
   
 void pglDisplay::BeginTiming()
 {

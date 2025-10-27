@@ -18,7 +18,7 @@
 //========================================
 #include "platform.h" // base class
 #include <data/config/gameconfig.h> // interface
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 //========================================
 // Forward References
@@ -136,7 +136,7 @@ private:
     // Windows methods.
     void ResizeWindow();
     static void ShowTheCursor( bool show );
-    static int SDLCALL WndProc( void* userdata, SDL_Event* msg );
+    static bool SDLCALL WndProc( void* userdata, SDL_Event* msg );
 
 private:
 
@@ -149,7 +149,6 @@ private:
 #ifdef WIN32
     static void * mhMutex;
 #endif
-    static bool mShowCursor;
 
     // Pure 3D attributes
     tPlatform* mpPlatform; 

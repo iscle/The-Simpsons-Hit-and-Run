@@ -20,7 +20,7 @@
 //============================================================================
 
 #include "pch.hpp"
-#include <SDL.h>
+#include <SDL3/SDL.h>
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>

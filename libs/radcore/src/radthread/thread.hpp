@@ -24,7 +24,7 @@
 // Include Files
 //=============================================================================
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include <radobject.hpp>
 #include <radmemory.hpp>
@@ -257,7 +257,7 @@ class radThread : public IRadThread,
     //
     // Platform specific information used to manage the thread.
     //
-    SDL_threadID    m_ThreadId;
+    SDL_ThreadID    m_ThreadId;
     SDL_Thread*     m_ThreadHandle;
     static SDL_ThreadPriority s_PriorityMap[ PriorityHigh + 1 ];
 
