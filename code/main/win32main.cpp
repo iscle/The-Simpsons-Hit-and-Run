@@ -31,6 +31,11 @@
 unsigned int sceLibcHeapSize = 16 * 1024 * 1024;
 #endif
 
+#ifdef __ANDROID__
+#include <unistd.h>
+extern "C" const char* GetAndroidAssetsPath();
+#endif
+
 //========================================
 // Project Includes
 //========================================
@@ -81,6 +86,15 @@ extern "C" int main( int argc, char *argv[] )
 #endif
 #ifdef RAD_VITA
 	chdir( "ux0:data/simpsons" );
+#endif
+#ifdef __ANDROID__
+    const char* assetsPath = GetAndroidAssetsPath();
+    if (assetsPath && assetsPath[0] != '\0') {
+        chdir(assetsPath);
+        printf("Changed directory to: %s\n", assetsPath);
+    } else {
+        printf("Warning: Assets path not set!\n");
+    }
 #endif
 
     //

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.22.1)
 
 project(SRR2)
 
@@ -56,11 +56,11 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 	endif()
 endif()
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-	add_compile_definitions(RAD_DEBUG)
-else()
+#if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+#	add_compile_definitions(RAD_DEBUG)
+#else()
 	add_compile_definitions(RAD_RELEASE)
-endif()
+#endif()
 
 add_compile_definitions(
 	RAD_CONSOLE
@@ -1405,7 +1405,12 @@ if(SRR2_USE_BINK)
 	)
 endif()
 
-add_executable(${PROJECT_NAME} ${SRR2_SOURCES})
+if(ANDROID)
+	add_library(${PROJECT_NAME} SHARED ${SRR2_SOURCES})
+else()
+	add_executable(${PROJECT_NAME} ${SRR2_SOURCES})
+endif()
+
 target_link_libraries(${PROJECT_NAME}
 	SDL3::SDL3
 	choreo
@@ -1423,6 +1428,9 @@ target_link_libraries(${PROJECT_NAME}
 	sim
 	Threads::Threads
 )
+if(ANDROID)
+	target_link_libraries(${PROJECT_NAME} android_jni)
+endif()
 if(SRR2_MICROPROFILE AND WIN32)
 	# needed for microprofile
 	target_link_libraries(SRR2 wsock32)

@@ -67,6 +67,14 @@ unsigned pglDevice::GetCaps()
     return 0;
 }
 
+void pglDevice::FillDisplayMode(const SDL_DisplayMode* mode, pddiModeInfo* info)
+{
+    info->width = mode->w;
+    info->height = mode->h;
+    const SDL_PixelFormatDetails* formatDetails = SDL_GetPixelFormatDetails(mode->format);
+    info->bpp = (formatDetails->bits_per_pixel > 0) ? formatDetails->bits_per_pixel : 32; // fallback if unknown
+}
+
 int pglDevice::GetDisplayInfo(pddiDisplayInfo** info)
 {
     *info = displayInfo;
@@ -84,26 +92,40 @@ int pglDevice::GetDisplayInfo(pddiDisplayInfo** info)
     for(int i = 0; i < totalDisplay; i++)
     {
         SDL_DisplayID displayID = displays[i];
-        const char* displayName = SDL_GetDisplayName(displayID);
 
-        const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(displayID);
-        if (!displayName || !mode) {
+        const char* displayName = SDL_GetDisplayName(displayID);
+        if (!displayName)
+            continue;
+
+        int fullscreenModeCount;
+        SDL_DisplayMode **fullscreenModes = SDL_GetFullscreenDisplayModes(displayID, &fullscreenModeCount);
+        const SDL_DisplayMode *desktopMode = SDL_GetDesktopDisplayMode(displayID);
+        if ((!fullscreenModes || fullscreenModeCount == 0) && !desktopMode)
+        {
+            if (fullscreenModes) SDL_free(fullscreenModes);
             continue;
         }
 
         displayInfo[nDisplays].id = i;
-        strcpy(displayInfo[0].description,displayName);
+        strncpy(displayInfo[nDisplays].description, displayName, sizeof(displayInfo[nDisplays].description));
+        displayInfo[nDisplays].description[sizeof(displayInfo[nDisplays].description) - 1] = '\0';
         displayInfo[nDisplays].pci = 0;
         displayInfo[nDisplays].vendor = 0;
-        displayInfo[nDisplays].fullscreenOnly = false;
         displayInfo[nDisplays].caps = 0;
 
-        displayInfo[nDisplays].modeInfo = new pddiModeInfo[1];
-        displayInfo[nDisplays].nDisplayModes = 1;
-        displayInfo[nDisplays].modeInfo[0].width = mode->w;
-        displayInfo[nDisplays].modeInfo[0].height = mode->h;
-        const SDL_PixelFormatDetails* formatDetails = SDL_GetPixelFormatDetails(mode->format);
-        displayInfo[nDisplays].modeInfo[0].bpp = (formatDetails->bits_per_pixel > 0) ? formatDetails->bits_per_pixel : 32; // fallback if unknown
+        displayInfo[nDisplays].nDisplayModes = (fullscreenModes ? fullscreenModeCount : 0) + (desktopMode ? 1 : 0);
+        displayInfo[nDisplays].modeInfo = new pddiModeInfo[displayInfo[nDisplays].nDisplayModes];
+
+        for (int j = 0; fullscreenModes && j < fullscreenModeCount; j++)
+        {
+            FillDisplayMode(fullscreenModes[j], &displayInfo[nDisplays].modeInfo[j]);
+        }
+
+        if (desktopMode)
+        {
+            FillDisplayMode(desktopMode, &displayInfo[nDisplays].modeInfo[displayInfo[nDisplays].nDisplayModes - 1]);
+        }
+
         nDisplays++;
     }
 

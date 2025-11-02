@@ -165,7 +165,7 @@ public:
     void SetTop (GameMemoryAllocator alloc);
     GameMemoryAllocator Top () const;
 
-#ifndef RAD_REALEASE
+#ifndef RAD_RELEASE
     void Dump ();
 #endif
 

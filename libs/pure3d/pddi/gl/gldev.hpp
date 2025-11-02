@@ -35,6 +35,8 @@ public:
     void Release(void);
 
 protected:
+    static void FillDisplayMode(const SDL_DisplayMode *mode, pddiModeInfo *info);
+
     bool initialized;
     pddiRenderContext* context;
 

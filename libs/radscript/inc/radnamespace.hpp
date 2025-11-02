@@ -34,6 +34,17 @@
 
 struct IRadNameSpace;
 
+//=============================================================================
+// Static variables
+//=============================================================================
+
+//
+// By default there are no namespaces
+//
+template<> inline IRadNameSpace* radLinkedClass< IRadNameSpace >::s_pLinkedClassHead = NULL;
+template<> inline IRadNameSpace* radLinkedClass< IRadNameSpace >::s_pLinkedClassTail = NULL;
+
+
 //============================================================================
 // Factories and functions
 //============================================================================

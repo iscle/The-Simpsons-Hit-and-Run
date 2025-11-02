@@ -75,8 +75,8 @@ private:
     float gammaR,gammaG,gammaB;
 
     SDL_Window* win;
-    void* hRC;
-    void* prevRC;
+    SDL_GLContext hRC;
+    SDL_GLContext prevRC;
 
     bool extBGRA;
 #ifdef RAD_GLES
