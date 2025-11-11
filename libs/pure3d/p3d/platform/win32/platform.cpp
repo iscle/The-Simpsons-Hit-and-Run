@@ -205,9 +205,6 @@ P3D_U64 tPlatform::GetTime(void)
 //------------------------------------------------------------------------
 bool tPlatform::ProcessWindowsMessage(SDL_Window* win, const SDL_WindowEvent* event)
 {
-    if(!this)
-        return false;
-
     for(int i = 0; i < nContexts; i++)
         //if(contexts[i].windowHandle == win)
             return contexts[i].context->RenderDisplay->ProcessWindowMessage(win, event) != 0;

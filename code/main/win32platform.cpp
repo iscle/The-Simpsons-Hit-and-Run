@@ -1852,7 +1852,8 @@ bool SDLCALL Win32Platform::WndProc( void * userdata, SDL_Event * event )
             // Under Win32, Pure3D needs to get a crack at the Windows messages so
             // it can detect window moving, resizing, and activation.
             //
-            p3d::platform->ProcessWindowsMessage( wnd, &event->window );
+            if (p3d::platform != NULL)
+                p3d::platform->ProcessWindowsMessage( wnd, &event->window );
 
             if( spInstance != NULL && spInstance->mpContext != NULL )
             {
