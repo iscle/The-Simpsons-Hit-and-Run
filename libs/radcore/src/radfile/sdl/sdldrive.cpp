@@ -36,8 +36,306 @@
 #endif
 #endif
 
+#ifdef __EMSCRIPTEN__
 //=============================================================================
-// Public Functions 
+// HTTP-streamed asset files (browser build)
+//=============================================================================
+//
+// Game assets are not preloaded into memory; read-only files that don't
+// exist in the local (in-memory) filesystem are opened as SDL_RWops backed
+// by HTTP Range requests against /assets/ on the host. Only the chunks a
+// read touches are fetched and a small per-file LRU keeps recent ones, so
+// resident memory stays proportional to what the game is actually using.
+// All calls happen on the drive thread (a pthread), where synchronous
+// emscripten_fetch is allowed.
+//
+
+#include <emscripten.h>
+#include <emscripten/fetch.h>
+#include <ctype.h>
+#include <map>
+#include <list>
+#include <vector>
+
+// Monotonic count of files the game has opened. Used by the page's boot
+// progress bar (read from the main thread each frame). Written on the drive
+// thread; exact synchronization is unnecessary for a progress display.
+volatile int g_radFileOpenCount = 0;
+
+namespace
+{
+    // Save files (Save1..Save4 at the FS root) are the only writes the game
+    // makes. They live in the in-memory filesystem, so after each save is
+    // written we mirror it to IndexedDB (see Module.persistSave in the shell)
+    // and restore it before boot, giving persistent saves across reloads.
+    bool radEmIsSaveFile( const char* fileName )
+    {
+        const char* p = strstr( fileName, "Save" );
+        return p != NULL && isdigit( (unsigned char) p[ 4 ] );
+    }
+
+    void radEmPersistSave( const char* fileName )
+    {
+        // Normalize to the root-relative path the JS FS uses ("/SaveN").
+        const char* base = fileName;
+        for ( const char* p = fileName; *p != '\0'; p++ )
+        {
+            if ( *p == '/' || *p == '\\' )
+            {
+                base = p + 1;
+            }
+        }
+        char path[ 64 ];
+        snprintf( path, sizeof( path ), "/%s", base );
+        MAIN_THREAD_EM_ASM(
+            { if ( Module.persistSave ) Module.persistSave( UTF8ToString( $0 ) ); },
+            path );
+    }
+
+    const unsigned int kHttpChunkBytes = 1024 * 1024;
+    const unsigned int kHttpMaxCachedChunks = 8; // per open file
+
+    struct radEmHttpFile
+    {
+        char m_Url[ 560 ];
+        Sint64 m_Size;
+        Sint64 m_Pos;
+        std::map< unsigned int, std::vector< unsigned char > > m_Chunks;
+        std::list< unsigned int > m_Lru;
+    };
+
+    Sint64 radEmHttpGetSize( const char* url )
+    {
+        emscripten_fetch_attr_t attr;
+        emscripten_fetch_attr_init( &attr );
+        strcpy( attr.requestMethod, "HEAD" );
+        attr.attributes = EMSCRIPTEN_FETCH_SYNCHRONOUS;
+
+        emscripten_fetch_t* fetch = emscripten_fetch( &attr, url );
+        if ( fetch == NULL )
+        {
+            return -1;
+        }
+
+        Sint64 size = -1;
+        if ( fetch->status == 200 )
+        {
+            size_t headersLength = emscripten_fetch_get_response_headers_length( fetch );
+            std::vector< char > headers( headersLength + 1 );
+            emscripten_fetch_get_response_headers( fetch, &headers[ 0 ], headersLength + 1 );
+            for ( char* p = &headers[ 0 ]; *p != '\0'; p++ )
+            {
+                *p = ( char ) tolower( *p );
+            }
+            const char* contentLength = strstr( &headers[ 0 ], "content-length:" );
+            if ( contentLength != NULL )
+            {
+                size = strtoll( contentLength + 15, NULL, 10 );
+            }
+        }
+        emscripten_fetch_close( fetch );
+        return size;
+    }
+
+    bool radEmHttpFetchChunk( radEmHttpFile* pFile, unsigned int chunkIndex )
+    {
+        Sint64 start = ( Sint64 ) chunkIndex * kHttpChunkBytes;
+        Sint64 end = start + kHttpChunkBytes - 1;
+        if ( end >= pFile->m_Size )
+        {
+            end = pFile->m_Size - 1;
+        }
+
+        char range[ 64 ];
+        snprintf( range, sizeof( range ), "bytes=%lld-%lld",
+            ( long long ) start, ( long long ) end );
+        const char* headers[] = { "Range", range, NULL };
+
+        emscripten_fetch_attr_t attr;
+        emscripten_fetch_attr_init( &attr );
+        strcpy( attr.requestMethod, "GET" );
+        attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY | EMSCRIPTEN_FETCH_SYNCHRONOUS;
+        attr.requestHeaders = headers;
+
+        emscripten_fetch_t* fetch = emscripten_fetch( &attr, pFile->m_Url );
+        if ( fetch == NULL )
+        {
+            return false;
+        }
+
+        bool ok = ( fetch->status == 206 || fetch->status == 200 ) && fetch->numBytes > 0;
+        if ( ok )
+        {
+            std::vector< unsigned char > & chunk = pFile->m_Chunks[ chunkIndex ];
+            chunk.assign( ( const unsigned char* ) fetch->data,
+                ( const unsigned char* ) fetch->data + fetch->numBytes );
+            pFile->m_Lru.push_back( chunkIndex );
+
+            while ( pFile->m_Lru.size( ) > kHttpMaxCachedChunks )
+            {
+                pFile->m_Chunks.erase( pFile->m_Lru.front( ) );
+                pFile->m_Lru.pop_front( );
+            }
+        }
+        emscripten_fetch_close( fetch );
+        return ok;
+    }
+
+    Sint64 radEmHttpRwSize( SDL_RWops* pContext )
+    {
+        return ( ( radEmHttpFile* ) pContext->hidden.unknown.data1 )->m_Size;
+    }
+
+    Sint64 radEmHttpRwSeek( SDL_RWops* pContext, Sint64 offset, int whence )
+    {
+        radEmHttpFile* pFile = ( radEmHttpFile* ) pContext->hidden.unknown.data1;
+        Sint64 newPos = pFile->m_Pos;
+        switch ( whence )
+        {
+            case RW_SEEK_SET: newPos = offset; break;
+            case RW_SEEK_CUR: newPos = pFile->m_Pos + offset; break;
+            case RW_SEEK_END: newPos = pFile->m_Size + offset; break;
+        }
+        if ( newPos < 0 )
+        {
+            return -1;
+        }
+        pFile->m_Pos = newPos;
+        return newPos;
+    }
+
+    size_t radEmHttpRwRead( SDL_RWops* pContext, void* ptr, size_t size, size_t maxnum )
+    {
+        radEmHttpFile* pFile = ( radEmHttpFile* ) pContext->hidden.unknown.data1;
+
+        Sint64 totalBytes = ( Sint64 )( size * maxnum );
+        if ( pFile->m_Pos >= pFile->m_Size )
+        {
+            return 0;
+        }
+        if ( pFile->m_Pos + totalBytes > pFile->m_Size )
+        {
+            totalBytes = pFile->m_Size - pFile->m_Pos;
+        }
+
+        Sint64 bytesRead = 0;
+        unsigned char* pOut = ( unsigned char* ) ptr;
+
+        while ( bytesRead < totalBytes )
+        {
+            Sint64 pos = pFile->m_Pos + bytesRead;
+            unsigned int chunkIndex = ( unsigned int )( pos / kHttpChunkBytes );
+
+            std::map< unsigned int, std::vector< unsigned char > >::iterator it =
+                pFile->m_Chunks.find( chunkIndex );
+            if ( it == pFile->m_Chunks.end( ) )
+            {
+                if ( !radEmHttpFetchChunk( pFile, chunkIndex ) )
+                {
+                    break;
+                }
+                it = pFile->m_Chunks.find( chunkIndex );
+            }
+
+            Sint64 chunkOffset = pos - ( Sint64 ) chunkIndex * kHttpChunkBytes;
+            Sint64 available = ( Sint64 ) it->second.size( ) - chunkOffset;
+            if ( available <= 0 )
+            {
+                break;
+            }
+            Sint64 copyBytes = totalBytes - bytesRead;
+            if ( copyBytes > available )
+            {
+                copyBytes = available;
+            }
+            memcpy( pOut + bytesRead, &it->second[ chunkOffset ], ( size_t ) copyBytes );
+            bytesRead += copyBytes;
+        }
+
+        pFile->m_Pos += bytesRead;
+        return ( size_t )( size > 0 ? bytesRead / ( Sint64 ) size : 0 );
+    }
+
+    size_t radEmHttpRwWrite( SDL_RWops* pContext, const void* ptr, size_t size, size_t num )
+    {
+        (void) pContext; (void) ptr; (void) size; (void) num;
+        return 0;
+    }
+
+    int radEmHttpRwClose( SDL_RWops* pContext )
+    {
+        delete ( radEmHttpFile* ) pContext->hidden.unknown.data1;
+        SDL_FreeRW( pContext );
+        return 0;
+    }
+
+    // Base URL that game asset requests are resolved against. Defaults to the
+    // same-origin "/assets/", but the page can override it (Module.assetBaseUrl)
+    // so the build can be hosted somewhere that can't serve the ~1.8GB of data
+    // itself (e.g. GitHub Pages) and stream assets from a separate host. Read
+    // once, lazily, from the main thread. The value must end with '/'.
+    const char* radEmAssetBase( void )
+    {
+        static char base[ 512 ] = { 0 };
+        static bool initialized = false;
+        if ( !initialized )
+        {
+            initialized = true;
+            MAIN_THREAD_EM_ASM( {
+                var s = ( Module.assetBaseUrl || '/assets/' );
+                if ( s.charAt( s.length - 1 ) !== '/' ) { s += '/'; }
+                stringToUTF8( s, $0, 512 );
+            }, base );
+            if ( base[ 0 ] == '\0' )
+            {
+                strcpy( base, "/assets/" );
+            }
+        }
+        return base;
+    }
+
+    SDL_RWops* radEmHttpOpen( const char* fullName )
+    {
+        const char* relative = fullName;
+        while ( *relative == '/' )
+        {
+            relative++;
+        }
+        if ( *relative == '\0' )
+        {
+            return NULL;
+        }
+
+        radEmHttpFile* pFile = new radEmHttpFile;
+        snprintf( pFile->m_Url, sizeof( pFile->m_Url ), "%s%s", radEmAssetBase(), relative );
+        pFile->m_Pos = 0;
+        pFile->m_Size = radEmHttpGetSize( pFile->m_Url );
+        if ( pFile->m_Size < 0 )
+        {
+            delete pFile;
+            return NULL;
+        }
+
+        SDL_RWops* pRw = SDL_AllocRW( );
+        if ( pRw == NULL )
+        {
+            delete pFile;
+            return NULL;
+        }
+        pRw->size = radEmHttpRwSize;
+        pRw->seek = radEmHttpRwSeek;
+        pRw->read = radEmHttpRwRead;
+        pRw->write = radEmHttpRwWrite;
+        pRw->close = radEmHttpRwClose;
+        pRw->type = SDL_RWOPS_UNKNOWN;
+        pRw->hidden.unknown.data1 = pFile;
+        return pRw;
+    }
+}
+#endif // __EMSCRIPTEN__
+
+//=============================================================================
+// Public Functions
 //=============================================================================
 
 //=============================================================================
@@ -76,11 +374,20 @@ void radSdlDriveFactory
 //=============================================================================
 
 radSdlDrive::radSdlDrive( const char* pdrivespec, radMemoryAllocator alloc )
-    : 
+    :
     radDrive( ),
     m_OpenFiles( 0 ),
     m_pMutex( NULL )
 {
+    //
+    // The default-drive path is set from getcwd() below, gated on
+    // m_DrivePath being empty. That relies on zero-initialized memory, which
+    // the heap allocator does not guarantee (e.g. under Emscripten WasmFS the
+    // buffer is garbage and getcwd() gets skipped, corrupting every path).
+    //
+    m_DriveName[ 0 ] = '\0';
+    m_DrivePath[ 0 ] = '\0';
+
     //
     // Create a mutex for lock/unlock
     //
@@ -250,9 +557,23 @@ radDrive::CompletionStatus radSdlDrive::OpenFile
     *pHandle = SDL_IOFromFile( fullName, createFlags );
 #endif
 
+#ifdef __EMSCRIPTEN__
+    //
+    // Read-only files missing from the local in-memory filesystem (i.e. the
+    // game assets) are streamed from the server on demand.
+    //
+    if ( *pHandle == NULL && flags == OpenExisting && !writeAccess )
+    {
+        *pHandle = radEmHttpOpen( fullName );
+    }
+#endif
+
     if ( *pHandle )
     {
         m_OpenFiles++;
+#ifdef __EMSCRIPTEN__
+        g_radFileOpenCount++;
+#endif
 #if SDL_MAJOR_VERSION < 3
         *pSize = SDL_RWsize( (SDL_RWops*)*pHandle );
 #else
@@ -263,6 +584,10 @@ radDrive::CompletionStatus radSdlDrive::OpenFile
     }
     else
     {
+#if defined(__EMSCRIPTEN__) && defined(SRR2_DEBUG_FILEIO)
+        SDL_Log( "radSdlDrive::OpenFile FileNotFound: fullName='%s' (in='%s' drivePath='%s')",
+                 fullName, fileName, m_DrivePath );
+#endif
         m_LastError = FileNotFound;
         return Error;
     }
@@ -280,6 +605,19 @@ radDrive::CompletionStatus radSdlDrive::CloseFile( radFileHandle handle, const c
     SDL_CloseIO( (SDL_IOStream*)handle );
 #endif
     m_OpenFiles--;
+
+#ifdef __EMSCRIPTEN__
+    //
+    // A save file was just flushed and closed; mirror it to persistent
+    // storage. (Harmless if it was only opened for reading -- the bytes are
+    // the same.)
+    //
+    if ( fileName != NULL && radEmIsSaveFile( fileName ) )
+    {
+        radEmPersistSave( fileName );
+    }
+#endif
+
     return Complete;
 }
 

@@ -1660,8 +1660,14 @@ void HeapManager::DumpArtStats ()
     const float HS_AUDIO_PERSISTENT = 2.7f;
     const float HS_LEVEL = 20.01f;    // 0.01 for sub-heap creation overhead
     //FE Only
+#ifdef __EMSCRIPTEN__
+    // The FFmpeg movie player tiles frames into 1024x1024x32 textures (4MB
+    // each) plus decode buffers, which does not fit the original 3.94MB.
+    const float HS_LEVEL_MOVIE = 16.0f;
+#else
     const float HS_LEVEL_MOVIE = 3.94f; // TC: added extra 2.0 MB until memory leak
     //     in radMovie Bink player is fixed
+#endif
     const float HS_LEVEL_AUDIO_FE = 0.05f;
     const float HS_LEVEL_FE = 5.0f;
     //In-game Only

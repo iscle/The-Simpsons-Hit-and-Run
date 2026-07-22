@@ -80,6 +80,19 @@ void radSoundHalListener::SetPosition
 {
 	rAssert( pPosition != NULL );
 
+#ifdef __EMSCRIPTEN__
+	// Each alListener* call is proxied to the browser main thread and makes
+	// Emscripten's OpenAL respatialize every source; skip no-op updates.
+	static float s_last[ 3 ] = { 1e30f, 1e30f, 1e30f };
+	if( pPosition->m_x == s_last[ 0 ] && pPosition->m_y == s_last[ 1 ] && pPosition->m_z == s_last[ 2 ] )
+	{
+		return;
+	}
+	s_last[ 0 ] = pPosition->m_x;
+	s_last[ 1 ] = pPosition->m_y;
+	s_last[ 2 ] = pPosition->m_z;
+#endif
+
 	alListener3f(AL_POSITION, pPosition->m_x, pPosition->m_y, -pPosition->m_z);
 }
 
@@ -117,7 +130,18 @@ void radSoundHalListener::SetVelocity
 	}
 	
 #endif
-	
+
+#ifdef __EMSCRIPTEN__
+	static float s_last[ 3 ] = { 1e30f, 1e30f, 1e30f };
+	if( pVelocity->m_x == s_last[ 0 ] && pVelocity->m_y == s_last[ 1 ] && pVelocity->m_z == s_last[ 2 ] )
+	{
+		return;
+	}
+	s_last[ 0 ] = pVelocity->m_x;
+	s_last[ 1 ] = pVelocity->m_y;
+	s_last[ 2 ] = pVelocity->m_z;
+#endif
+
 	alListener3f(AL_VELOCITY, pVelocity->m_x, pVelocity->m_y, -pVelocity->m_z);
 }
 
@@ -155,6 +179,21 @@ void radSoundHalListener::SetOrientation
     };
 	orientation[0].m_z *= -1;
 	orientation[1].m_z *= -1;
+
+#ifdef __EMSCRIPTEN__
+	static float s_last[ 6 ] = { 1e30f, 1e30f, 1e30f, 1e30f, 1e30f, 1e30f };
+	float* f = (float*)orientation;
+	if( f[0] == s_last[0] && f[1] == s_last[1] && f[2] == s_last[2] &&
+	    f[3] == s_last[3] && f[4] == s_last[4] && f[5] == s_last[5] )
+	{
+		return;
+	}
+	for( int i = 0; i < 6; i++ )
+	{
+		s_last[ i ] = f[ i ];
+	}
+#endif
+
     alListenerfv(AL_ORIENTATION, (float*)orientation);
 }
 

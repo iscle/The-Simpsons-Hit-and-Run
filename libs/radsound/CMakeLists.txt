@@ -50,6 +50,10 @@ target_include_directories(radsound
 	PRIVATE "src/common/"
 	PRIVATE ${OPENAL_INCLUDE_DIR}
 )
+if(EMSCRIPTEN)
+	# Emscripten's OpenAL ships no efx.h; use the vendored openal-soft header.
+	target_include_directories(radsound PRIVATE "src/hal/openal-compat/")
+endif()
 target_link_libraries(radsound
 	${OPENAL_LIBRARY}
 	radcore

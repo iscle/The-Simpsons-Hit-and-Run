@@ -544,7 +544,9 @@ void pglContext::EndPrims(pddiPrimStream* stream)
     pddiBaseContext::EndPrims(stream);
     pglPrimStream* glstream = (pglPrimStream*)stream;
 
+#ifndef PDDI_NO_VAO
     glBindVertexArrayOES( 0 );
+#endif
     glBindBuffer( GL_ARRAY_BUFFER, 0 );
     glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
     glEnableVertexAttribArray( 0 );
@@ -805,7 +807,9 @@ pglPrimBuffer::~pglPrimBuffer()
 
     GLuint buffers[] = { vertexBuffer, indexBuffer };
     glDeleteBuffers(2, buffers);
+#ifndef PDDI_NO_VAO
     glDeleteVertexArraysOES(1, &vertexArray);
+#endif
 }
 
 pddiPrimBufferStream* pglPrimBuffer::Lock()
@@ -853,23 +857,34 @@ void pglPrimBuffer::Display(void)
 {
     MICROPROFILE_SCOPEI("PDDI", "pglPrimBuffer::Display", MP_RED);
 
-    if(!valid)
+    bool needSetup = !valid;
+#ifdef PDDI_NO_VAO
+    // Without vertex array objects the attribute layout is global state, so
+    // re-bind buffers and re-specify the layout on every draw.
+    needSetup = true;
+#endif
+
+    if(needSetup)
     {
+#ifndef PDDI_NO_VAO
         if(!vertexArray)
             glGenVertexArraysOES(1, &vertexArray);
         glBindVertexArrayOES(vertexArray);
+#endif
 
         if(!vertexBuffer)
             glGenBuffers(1, &vertexBuffer);
         glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-        glBufferData(GL_ARRAY_BUFFER, mem, buffer, GL_STATIC_DRAW);
+        if(!valid)
+            glBufferData(GL_ARRAY_BUFFER, mem, buffer, GL_STATIC_DRAW);
 
         if(indexCount && indices)
         {
             if(!indexBuffer)
                 glGenBuffers(1, &indexBuffer);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,indexBuffer);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER,indexCount*sizeof(unsigned short),indices,GL_STATIC_DRAW);
+            if(!valid)
+                glBufferData(GL_ELEMENT_ARRAY_BUFFER,indexCount*sizeof(unsigned short),indices,GL_STATIC_DRAW);
         }
         else
         {
@@ -918,10 +933,12 @@ void pglPrimBuffer::Display(void)
         }
         valid = true;
     }
+#ifndef PDDI_NO_VAO
     else
     {
         glBindVertexArrayOES(vertexArray);
     }
+#endif
 
     if(indexCount && indices)
     {

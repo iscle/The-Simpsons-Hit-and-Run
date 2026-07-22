@@ -76,4 +76,7 @@ template < class T > class radLinkedClass
     static T * s_pLinkedClassTail;
 };
 
+template < class T > T * radLinkedClass< T >::s_pLinkedClassHead = NULL;
+template < class T > T * radLinkedClass< T >::s_pLinkedClassTail = NULL;
+
 #endif // LINKED_CLASS

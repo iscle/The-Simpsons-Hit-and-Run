@@ -128,8 +128,6 @@ static void BinkAramFree( void * pBuffer )
 // Static initialization
 //=============================================================================
 
-template<> radMoviePlayerBink * radLinkedClass< radMoviePlayerBink >::s_pLinkedClassHead = NULL;
-template<> radMoviePlayerBink * radLinkedClass< radMoviePlayerBink >::s_pLinkedClassTail = NULL;
 
 //=============================================================================
 // radMoviePlayerBink::radMoviePlayerBink

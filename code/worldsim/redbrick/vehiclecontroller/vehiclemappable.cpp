@@ -114,10 +114,22 @@ void VehicleMappable::LoadControllerMappings( unsigned int controllerId )
 	//Map( "RightStickY", Throttle, 0, controllerId );  Not on XBOX, please
 
 	Map( "RightTrigger", Gas, 0, controllerId );
-  	Map( "A", Gas, 0, controllerId );
-
-    Map( "B", Brake, 0, controllerId );
     Map( "LeftTrigger", Brake, 0, controllerId );
+
+#ifdef __EMSCRIPTEN__
+    // Browser keyboard/mouse reproduces the retail simpsons.ini car layout. The
+    // keyboard pad has no analog triggers, so gas/brake come from the left-stick
+    // Y axis (W/S) via the throttle - the same keys that walk the character
+    // (positive throttle is gas, negative is brake; W reads positive here). That
+    // frees the A/B face buttons, so map them to the retail in-car bindings:
+    // Space (A) -> Reset (flip) car, LShift (B) -> Horn.
+    Map( "LeftStickY", Throttle, 0, controllerId );
+    Map( "A", Reset, 0, controllerId );
+    Map( "B", Horn, 0, controllerId );
+#else
+  	Map( "A", Gas, 0, controllerId );
+    Map( "B", Brake, 0, controllerId );
+#endif
 
 	Map( "X", HandBrake, 0, controllerId );
 

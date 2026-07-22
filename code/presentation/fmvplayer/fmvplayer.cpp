@@ -21,6 +21,7 @@
 #include <radmovie2.hpp>
 #include <radcontroller.hpp>
 #include <radfile.hpp>
+#include <radthread.hpp>
 #include <radmemory.hpp>
 //========================================
 // Project Includes
@@ -129,7 +130,7 @@ FMVPlayer::~FMVPlayer()
 // Return:      void 
 //
 //=============================================================================
-void FMVPlayer::LoadData( const char* fileName, bool bInInventory, void* pUserData ) 
+void FMVPlayer::LoadData( const char* fileName, bool bInInventory, void* pUserData )
 {
     if( GetState() == ANIM_IDLE || GetState() == ANIM_LOADING )
     {
@@ -140,6 +141,9 @@ void FMVPlayer::LoadData( const char* fileName, bool bInInventory, void* pUserDa
             ::radFileService( );
             SoundManager::GetInstance()->Update();
             SoundManager::GetInstance()->UpdateOncePerFrame( 0, NUM_CONTEXTS, false );
+#ifdef __EMSCRIPTEN__
+            ::radThreadSleep( 0 ); // drain the browser main thread's proxied-syscall queue
+#endif
         }
 
         GameMemoryAllocator allocator = GMA_LEVEL_MOVIE;
@@ -174,6 +178,9 @@ void FMVPlayer::LoadData( const char* fileName, bool bInInventory, void* pUserDa
             ::radFileService( );
             SoundManager::GetInstance()->Update();
             SoundManager::GetInstance()->UpdateOncePerFrame( 0, NUM_CONTEXTS, false );
+#ifdef __EMSCRIPTEN__
+            ::radThreadSleep( 0 ); // drain the browser main thread's proxied-syscall queue
+#endif
         }
         HeapMgr()->PopHeap(allocator);
         SetState( ANIM_LOADED );
@@ -243,7 +250,7 @@ void FMVPlayer::Abort(void)
 //
 //=============================================================================
 void FMVPlayer::Stop()
-{ 
+{
 	// Force a clear screen.
 	FadeScreen(0.0f);
     p3d::context->SwapBuffers();
@@ -460,6 +467,9 @@ void FMVPlayer::ClearData()
             ::radFileService( );
             SoundManager::GetInstance()->Update();
             SoundManager::GetInstance()->UpdateOncePerFrame( 0, NUM_CONTEXTS, false );
+#ifdef __EMSCRIPTEN__
+            ::radThreadSleep( 0 ); // drain the browser main thread's proxied-syscall queue
+#endif
         }
     }
 

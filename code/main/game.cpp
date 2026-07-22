@@ -29,6 +29,11 @@
 
 #ifdef RAD_WIN32
 #include <SDL.h>  // for SDL_PollEvent...
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/threading.h>
+#endif
 #endif
 
 //========================================
@@ -51,6 +56,10 @@
 
 #include <render/RenderFlow/renderflow.h>
 #include <sound/soundmanager.h>
+#ifdef __EMSCRIPTEN__
+#include <loading/loadingmanager.h>
+#include <p3d/loadmanager.hpp>
+#endif
 #include <input/inputmanager.h>
 
 //******************************************************************************
@@ -453,6 +462,18 @@ const unsigned PROFILE_CHANNEL_AI = 1;
 const unsigned PROFILE_CHANNEL_RENDER = 2;
 const unsigned PROFILE_CHANNEL_LOAD = 3;
 
+#ifdef __EMSCRIPTEN__
+static void EmscriptenFrame( void* arg )
+{
+    Game* pGame = static_cast<Game*>( arg );
+    pGame->RunFrame();
+    if( pGame->IsExiting() )
+    {
+        emscripten_cancel_main_loop();
+    }
+}
+#endif
+
 void Game::Run() 
 {
     extern bool g_AllowDebugOutput;
@@ -486,8 +507,25 @@ void Game::Run()
 
 #endif
 
-    unsigned time = radTimeGetMilliseconds();
+    mLastFrameTime = radTimeGetMilliseconds();
+
+#ifdef __EMSCRIPTEN__
+    // The browser owns the event loop; run one frame per animation callback.
+    emscripten_set_main_loop_arg( EmscriptenFrame, this, 0, 1 );
+#else
     while( !mExitNow )
+    {
+        RunFrame();
+    }
+#endif
+}
+
+void Game::RunFrame()
+{
+    extern bool g_AllowDebugOutput;
+
+    unsigned & time = mLastFrameTime;
+
     {
         DEMOPROFILE( g_DemoProfiler.Start(PROFILE_CHANNEL_ALL); )
 
@@ -521,6 +559,7 @@ void Game::Run()
                 {
                     GetGame()->GetPlatform()->LaunchDashboard();
                     //return to the winmain and shutdown
+                    mExitNow = true;
                     return;
                 }
                 //we are in a context that will transition nicely to the Exit context.
@@ -568,6 +607,76 @@ void Game::Run()
         // Service FTech subsystems.
         //
         ::radFileService();
+
+#ifdef __EMSCRIPTEN__
+        //
+        // Loading runs cooperatively on this (main) thread, so advancing it
+        // and rendering the loading screen compete for the frame. Give
+        // loading a bounded slice each frame, then break to let the frame
+        // present -- this keeps the loading screen animating smoothly (~20fps
+        // floor) instead of blocking for a long burst, while still processing
+        // many items per frame when they are quick.
+        //
+        {
+            unsigned pumpStart = radTimeGetMilliseconds();
+            const unsigned pumpBudgetMs = 40;
+            while( GetLoadingManager()->IsLoading() ||
+                   ::radFileGetNumOutstandingRequests() > 0 )
+            {
+                p3d::loadManager->SwitchTask();
+                ::radFileService();
+                ::radThreadSleep( 0 );
+                if( radTimeGetMilliseconds() - pumpStart >= pumpBudgetMs )
+                {
+                    break;
+                }
+            }
+        }
+
+        //
+        // Drive the page's initial boot progress bar. Boot is considered done
+        // once we reach the frontend (title screen); the bar is filled from
+        // the number of asset files opened so far against a typical boot
+        // total (the bar snaps to 100% at the frontend regardless).
+        //
+        {
+            extern volatile int g_radFileOpenCount;
+            static bool s_bootProgressDone = false;
+            if( !s_bootProgressDone )
+            {
+                if( mpGameFlow->GetCurrentContext() == CONTEXT_FRONTEND )
+                {
+                    s_bootProgressDone = true;
+                    MAIN_THREAD_EM_ASM( { if ( Module.setBootProgress ) Module.setBootProgress( 1.0 ); } );
+                }
+                else
+                {
+                    // Boot opens ~59 asset files before reaching the title
+                    // screen; scale the bar to that (it snaps to 100% at the
+                    // frontend regardless, so a slight mismatch is harmless).
+                    const float bootFileTarget = 62.0f;
+                    float pct = (float)g_radFileOpenCount / bootFileTarget;
+                    if( pct > 0.98f ) pct = 0.98f;
+                    MAIN_THREAD_EM_ASM( { if ( Module.setBootProgress ) Module.setBootProgress( $0 ); }, pct );
+                }
+            }
+        }
+
+        // Tell the page when the player is in active gameplay (in a level or
+        // paused), so it can warn before the tab is closed with unsaved
+        // progress. Only fire on transitions to avoid a per-frame JS call.
+        {
+            static int s_lastGameplayActive = -1;
+            int active = ( mpGameFlow->GetCurrentContext() == CONTEXT_GAMEPLAY ||
+                           mpGameFlow->GetCurrentContext() == CONTEXT_PAUSE ) ? 1 : 0;
+            if( active != s_lastGameplayActive )
+            {
+                s_lastGameplayActive = active;
+                MAIN_THREAD_EM_ASM( { if ( Module.setGameplayActive ) Module.setGameplayActive( $0 ); }, active );
+            }
+        }
+#endif
+
         ::radDbgComService();
         ::radDebugConsoleService();
         
@@ -691,6 +800,7 @@ Game::Game( Platform* platform ) :
     mpGameFlow( NULL ),
     mpRenderFlow( NULL ),
     mFrameCount( 0 ),
+    mLastFrameTime( 0 ),
     mExitNow( false ),
     mDemoCount( 0 ),
     mTimeMS( 0 )

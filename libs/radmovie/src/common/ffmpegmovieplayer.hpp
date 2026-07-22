@@ -46,6 +46,7 @@ struct SwsContext;
 struct SwrContext;
 struct AVFrame;
 struct AVPacket;
+struct AVIOContext;
 
 //=============================================================================
 // Type Definitions
@@ -133,6 +134,15 @@ class radMoviePlayer
         AVFrame * m_pAudioFrame;
 
         ALuint m_AudioSource;
+
+#ifdef __EMSCRIPTEN__
+        // Browser build: FFmpeg can't use its file protocol (movies are
+        // streamed over HTTP through radFile), so it reads via a custom AVIO
+        // context backed by radFile.
+        AVIOContext* m_pAvioCtx;
+        void*        m_pAvioRadFile;   // IRadFile*
+        unsigned char* m_pAvioBuffer;
+#endif
 };
 
 #endif // ! RAD_MOVIEPLAYER_USE_BINK

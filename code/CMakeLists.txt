@@ -589,6 +589,34 @@ else()
 	target_link_libraries(${PROJECT_NAME} PkgConfig::FFmpeg)
 endif()
 
+if(EMSCRIPTEN)
+	set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX ".html")
+	target_link_options(${PROJECT_NAME} PRIVATE
+		# Custom page: fullscreen is pure CSS scaling of the canvas, so the
+		# GL drawing buffer (and the game) never notices.
+		"SHELL:--shell-file ${CMAKE_SOURCE_DIR}/wasm-shell.html"
+		"SHELL:-sWASMFS=1"
+		"SHELL:-sFORCE_FILESYSTEM=1"
+		# Assets are streamed on demand over HTTP Range requests from
+		# /assets/ (see radEmHttpOpen in sdldrive.cpp), so only what the game
+		# touches is resident. -sFETCH provides synchronous fetch on the
+		# drive thread.
+		"SHELL:-sFETCH=1"
+		"SHELL:-sFULL_ES2=1"
+		"SHELL:-sGL_ENABLE_GET_PROC_ADDRESS=1"
+		"SHELL:-sALLOW_MEMORY_GROWTH=1"
+		"SHELL:-sINITIAL_MEMORY=512MB"
+		"SHELL:-sMAXIMUM_MEMORY=4GB"
+		"SHELL:-sPTHREAD_POOL_SIZE=8"
+		"SHELL:-sSTACK_SIZE=8MB"
+		"SHELL:-sDEFAULT_PTHREAD_STACK_SIZE=1MB"
+		# FS + run-dependency helpers are used by the page for persistent
+		# saves (restore before boot, mirror to IndexedDB on write).
+		"SHELL:-sEXPORTED_RUNTIME_METHODS=FS,addRunDependency,removeRunDependency,stringToUTF8,UTF8ToString"
+		"SHELL:-lopenal"
+	)
+endif()
+
 option(SRR2_USE_PCH ON)
 if (SRR2_USE_PCH)
 	target_precompile_headers(${PROJECT_NAME} PRIVATE "main/pchsrr2.h")

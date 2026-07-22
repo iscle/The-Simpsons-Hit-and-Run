@@ -36,6 +36,126 @@
 
 #include <SDL.h>
 
+#ifdef __EMSCRIPTEN__
+//============================================================================
+// Keyboard gamepad (browser build)
+//============================================================================
+//
+// The game only reads SDL game controllers, browsers rarely have one, and
+// Emscripten's SDL2 is built without the virtual joystick driver. Instead,
+// register one controller with a sentinel handle whose button/axis reads
+// come straight from the keyboard state:
+//   arrows = d-pad, WASD = left stick, Enter = Start, Space/Z = A, X = B,
+//   C = X, V = Y, Q/E = shoulders, Shift/Ctrl = triggers, Tab = Back.
+//
+
+#define RAD_KEYBOARD_PAD ( ( SDL_GameController* ) ( intptr_t ) -1 )
+
+static Uint8 radKeyboardPadGetButton( int button )
+{
+    const Uint8* keys = SDL_GetKeyboardState( NULL );
+    Uint32 mouse = SDL_GetMouseState( NULL, NULL );
+
+    // Exact retail keyboard + mouse layout from the PC build's simpsons.ini,
+    // translated onto the virtual console gamepad the game's mappables read.
+    // The same logical buttons mean different things on foot vs. in a car; the
+    // per-mode car meanings (Space->Reset, LShift->Horn) are produced by
+    // repurposing the now-redundant A/B car bindings in vehiclemappable.cpp
+    // (gas/brake come from the left-stick Y throttle instead).
+    //
+    //             ON FOOT            IN A CAR
+    //   W/S/A/D   move               accelerate / reverse / steer
+    //   Space     Jump               Reset (flip) car
+    //   LShift    Sprint             Horn
+    //   L-click   DoAction           get out of car
+    //   R-click   Attack             Handbrake
+    //   Numpad    camera             camera
+    //   Esc = pause / menu back   Enter = menu accept   F1 = disable tutorials
+    switch ( button )
+    {
+        // Arrow keys = d-pad: menu navigation, digital on-foot move, digital
+        // car steering.
+        case SDL_CONTROLLER_BUTTON_DPAD_UP:       return keys[ SDL_SCANCODE_UP ];
+        case SDL_CONTROLLER_BUTTON_DPAD_DOWN:     return keys[ SDL_SCANCODE_DOWN ];
+        case SDL_CONTROLLER_BUTTON_DPAD_LEFT:     return keys[ SDL_SCANCODE_LEFT ];
+        case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:    return keys[ SDL_SCANCODE_RIGHT ];
+
+        // Start = pause / "press start". Escape also acts as menu Back via B.
+        case SDL_CONTROLLER_BUTTON_START:         return keys[ SDL_SCANCODE_ESCAPE ];
+
+        // Back = menu back (Tab/Backspace).
+        case SDL_CONTROLLER_BUTTON_BACK:          return keys[ SDL_SCANCODE_TAB ] ||
+                                                         keys[ SDL_SCANCODE_BACKSPACE ];
+
+        // A = Jump (foot) / Reset car (car, via vehiclemappable) / menu Accept.
+        // Space is the retail bind; Enter also accepts menus.
+        case SDL_CONTROLLER_BUTTON_A:             return keys[ SDL_SCANCODE_SPACE ] ||
+                                                         keys[ SDL_SCANCODE_RETURN ] ||
+                                                         keys[ SDL_SCANCODE_KP_ENTER ];
+
+        // B = Sprint (foot) / Horn (car, via vehiclemappable) / menu Back.
+        case SDL_CONTROLLER_BUTTON_B:             return keys[ SDL_SCANCODE_LSHIFT ] ||
+                                                         keys[ SDL_SCANCODE_RSHIFT ] ||
+                                                         keys[ SDL_SCANCODE_ESCAPE ];
+
+        // X = Attack (foot) / Handbrake (car). Right mouse is the retail bind.
+        // F1 also lands here for the "[F1] Disable Tutorials" prompt (AuxX).
+        case SDL_CONTROLLER_BUTTON_X:             return keys[ SDL_SCANCODE_F1 ] ||
+                                                         ( mouse & SDL_BUTTON( SDL_BUTTON_RIGHT ) );
+
+        // Y = DoAction (foot: enter car / talk / pick up) / get out of car.
+        // Left mouse is the retail bind.
+        case SDL_CONTROLLER_BUTTON_Y:             return ( mouse & SDL_BUTTON( SDL_BUTTON_LEFT ) ) != 0;
+
+        // Numpad 0 = camera toggle ("Black" button in the console camera map).
+        case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:  return keys[ SDL_SCANCODE_KP_0 ];
+        default:                                  return 0;
+    }
+}
+
+static Sint16 radKeyboardPadGetAxis( int axis )
+{
+    const Uint8* keys = SDL_GetKeyboardState( NULL );
+
+    switch ( axis )
+    {
+        // Left stick = analog move (on foot) and steer + throttle (in a car).
+        case SDL_CONTROLLER_AXIS_LEFTX:
+            return ( keys[ SDL_SCANCODE_D ] ? 32767 : 0 ) - ( keys[ SDL_SCANCODE_A ] ? 32767 : 0 );
+        case SDL_CONTROLLER_AXIS_LEFTY:
+            return ( keys[ SDL_SCANCODE_S ] ? 32767 : 0 ) - ( keys[ SDL_SCANCODE_W ] ? 32767 : 0 );
+        // Right stick = camera pan, mapped to the numpad like the retail PC
+        // build (Numpad 4/6 left-right, 8/2 up-down, 5 zoom-toggle).
+        case SDL_CONTROLLER_AXIS_RIGHTX:
+            return ( keys[ SDL_SCANCODE_KP_6 ] ? 32767 : 0 ) - ( keys[ SDL_SCANCODE_KP_4 ] ? 32767 : 0 );
+        case SDL_CONTROLLER_AXIS_RIGHTY:
+            return ( keys[ SDL_SCANCODE_KP_2 ] ? 32767 : 0 ) - ( keys[ SDL_SCANCODE_KP_8 ] ? 32767 : 0 );
+        case SDL_CONTROLLER_AXIS_TRIGGERLEFT:
+            return keys[ SDL_SCANCODE_KP_5 ] ? 32767 : 0;
+        default:
+            return 0;
+    }
+}
+
+static inline Uint8 radPadGetButton( SDL_GameController* pController, int button )
+{
+    if ( pController == RAD_KEYBOARD_PAD )
+    {
+        return radKeyboardPadGetButton( button );
+    }
+    return SDL_GameControllerGetButton( pController, ( SDL_GameControllerButton ) button );
+}
+
+static inline Sint16 radPadGetAxis( SDL_GameController* pController, int axis )
+{
+    if ( pController == RAD_KEYBOARD_PAD )
+    {
+        return radKeyboardPadGetAxis( axis );
+    }
+    return SDL_GameControllerGetAxis( pController, ( SDL_GameControllerAxis ) axis );
+}
+#endif // __EMSCRIPTEN__
+
 //============================================================================
 // Internal Interfaces
 //============================================================================
@@ -282,7 +402,9 @@ class radControllerInputPointSDL
         {
             if ( m_pType == g_Sdlipt[ 0 ] ) // Button
             {
-#if SDL_MAJOR_VERSION < 3
+#ifdef __EMSCRIPTEN__
+                newValue = radPadGetButton( m_pController, m_Identifier ) ? 1.0f : 0.0f;
+#elif SDL_MAJOR_VERSION < 3
                 newValue = SDL_GameControllerGetButton( m_pController, (SDL_GameControllerButton)m_Identifier ) ? 1.0f : 0.0f;
 #else
                 newValue = SDL_GetGamepadButton( m_pController, (SDL_GamepadButton)m_Identifier ) ? 1.0f : 0.0f;
@@ -290,7 +412,9 @@ class radControllerInputPointSDL
             }
             else if ( m_pType == g_Sdlipt[ 1 ] ) // Analog Button
             {
-#if SDL_MAJOR_VERSION < 3
+#ifdef __EMSCRIPTEN__
+                newValue = radPadGetAxis( m_pController, m_Identifier );
+#elif SDL_MAJOR_VERSION < 3
                 newValue = SDL_GameControllerGetAxis( m_pController, (SDL_GameControllerAxis)m_Identifier );
 #else
                 newValue = SDL_GetGamepadAxis( m_pController, (SDL_GamepadAxis)m_Identifier );
@@ -299,7 +423,9 @@ class radControllerInputPointSDL
             }
             else if ( ( m_pType == g_Sdlipt[ 2 ] ) || ( m_pType == g_Sdlipt[ 3 ] ) ) // X/Y Axis
             {
-#if SDL_MAJOR_VERSION < 3
+#ifdef __EMSCRIPTEN__
+                newValue = radPadGetAxis( m_pController, m_Identifier );
+#elif SDL_MAJOR_VERSION < 3
                 newValue = SDL_GameControllerGetAxis( m_pController, (SDL_GameControllerAxis)m_Identifier );
 #else
                 newValue = SDL_GetGamepadAxis( m_pController, (SDL_GamepadAxis)m_Identifier );
@@ -713,6 +839,10 @@ class radControllerSDL
                     int result = 0;
 					if(m_pController != NULL)
 					{
+#ifdef __EMSCRIPTEN__
+                        if( m_pController != RAD_KEYBOARD_PAD )
+#endif
+                        {
 #if SDL_MAJOR_VERSION < 3
                         result = SDL_GameControllerRumble( m_pController,
                             m_LeftGain, m_RightGain, 0 );
@@ -720,6 +850,7 @@ class radControllerSDL
                         result = SDL_RumbleGamepad( m_pController,
                             m_LeftGain, m_RightGain, 0 );
 #endif
+                        }
 					}
 
                     //
@@ -794,6 +925,12 @@ class radControllerSDL
 
     virtual bool IsConnected( void )
     {
+#ifdef __EMSCRIPTEN__
+        if ( m_pController == RAD_KEYBOARD_PAD )
+        {
+            return true;
+        }
+#endif
 #if SDL_MAJOR_VERSION < 3
         return SDL_GameControllerGetAttached( m_pController ) == SDL_TRUE;
 #else
@@ -1118,11 +1255,21 @@ class radControllerSDL
         //
         // Create our location name based on our port and slot
         //
-#if SDL_MAJOR_VERSION < 3
-        int iController = std::max(SDL_GameControllerGetPlayerIndex( pController ), 0);
-#else
-        int iController = std::max(SDL_GetGamepadPlayerIndex( pController ), 0);
+        int iController;
+#ifdef __EMSCRIPTEN__
+        if ( pController == RAD_KEYBOARD_PAD )
+        {
+            iController = 0;
+        }
+        else
 #endif
+        {
+#if SDL_MAJOR_VERSION < 3
+            iController = std::max(SDL_GameControllerGetPlayerIndex( pController ), 0);
+#else
+            iController = std::max(SDL_GetGamepadPlayerIndex( pController ), 0);
+#endif
+        }
 		m_xIString_Location->SetSize( 12 );
         m_xIString_Location->Append( "Port" );
         m_xIString_Location->Append( (unsigned int) iController );
@@ -1667,6 +1814,41 @@ class radControllerSystemSDL
         //
         // TODO: If there is no connection change callback, wait synchronously for the connection
         //
+#ifdef __EMSCRIPTEN__
+        //
+        // Register the keyboard-backed controller first so it is always
+        // available as Port0 in the browser.
+        //
+        {
+            ref< IRadController > xIKeyboardController;
+            unsigned int keyboardVirtualTime = radTimeGetMilliseconds() + m_VirtualTimeAdjust;
+            unsigned int keyboardPollingRate = 10;
+
+            if( m_xITimer != NULL )
+            {
+                keyboardPollingRate = m_xITimer->GetTimeout();
+            }
+
+            xIKeyboardController = new (g_ControllerSystemAllocator) radControllerSDL
+            (
+                g_ControllerSystemAllocator,
+                RAD_KEYBOARD_PAD,
+                keyboardVirtualTime,
+                m_EventBufferTime,
+                keyboardPollingRate
+            );
+
+            m_xIOl_Controllers->AddObject( xIKeyboardController );
+
+            IRadWeakInterfaceWrapper* pIWir;
+            m_xIOl_Callbacks->Reset();
+            while((pIWir = reinterpret_cast<IRadWeakInterfaceWrapper*>(m_xIOl_Callbacks->GetNext())))
+            {
+                IRadControllerConnectionChangeCallback* pCallback = (IRadControllerConnectionChangeCallback*)pIWir->GetWeakInterface();
+                pCallback->OnControllerConnectionStatusChange( xIKeyboardController );
+            }
+        }
+#endif
 #if SDL_MAJOR_VERSION < 3
         int numJoysticks = SDL_NumJoysticks();
 #else

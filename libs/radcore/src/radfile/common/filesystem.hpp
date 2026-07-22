@@ -73,6 +73,8 @@ public:
 
     static void Service( void );
 
+    static unsigned int GetNumOutstandingRequests( void );
+
     static void SetRootDirectory( const char* pDrive, const char *pRootDir );
 
     static void GetRootDirectory( const char* pDrive, char* pRootDir );

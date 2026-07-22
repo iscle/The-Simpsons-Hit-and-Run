@@ -65,6 +65,12 @@ protected:
 
     void InternalService();
 
+    // Processes at most one queued load/callback item. Assumes the load mutex
+    // is held. Returns true if an item was processed. Used both by the worker
+    // thread (InternalService) and, on Emscripten, by the main thread so that
+    // loads (and their WebGL calls) never run off the main thread.
+    bool ProcessOneQueueItem();
+
     bool m_bSyncLoading;
     bool m_bDone;
 

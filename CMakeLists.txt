@@ -41,21 +41,36 @@ if(CCACHE_FOUND)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
 endif()
 
-if(NOT VITA)
-	find_package(SDL3)
-endif()
-if(SDL3_FOUND)
-	get_target_property(SDL_INCLUDE_DIR SDL3::Headers INTERFACE_INCLUDE_DIRECTORIES)
-	include_directories(${SDL_INCLUDE_DIR}/SDL3)
-	set(SDL_LIBRARY SDL3::SDL3)
+if(EMSCRIPTEN)
+	# Dependencies come from Emscripten's bundled ports (SDL2, libpng, OpenAL).
+	add_compile_options(-pthread "SHELL:--use-port=sdl2" "SHELL:--use-port=libpng"
+		"SHELL:-include stddef.h")
+	add_link_options(-pthread "SHELL:--use-port=sdl2" "SHELL:--use-port=libpng")
+	set(SDL_LIBRARY "")
+	add_library(PNG::PNG INTERFACE IMPORTED)
+	set(OPENAL_LIBRARY openal)
+	execute_process(COMMAND "${EMSCRIPTEN_ROOT_PATH}/em-config" CACHE
+		OUTPUT_VARIABLE EM_CACHE OUTPUT_STRIP_TRAILING_WHITESPACE)
+	set(OPENAL_INCLUDE_DIR "${EM_CACHE}/sysroot/include/AL")
+	set(THREADS_PREFER_PTHREAD_FLAG ON)
+	find_package(Threads REQUIRED)
 else()
-	find_package(SDL2 REQUIRED)
-	set(SDL_LIBRARY SDL2::SDL2 SDL2::SDL2main)
+	if(NOT VITA)
+		find_package(SDL3)
+	endif()
+	if(SDL3_FOUND)
+		get_target_property(SDL_INCLUDE_DIR SDL3::Headers INTERFACE_INCLUDE_DIRECTORIES)
+		include_directories(${SDL_INCLUDE_DIR}/SDL3)
+		set(SDL_LIBRARY SDL3::SDL3)
+	else()
+		find_package(SDL2 REQUIRED)
+		set(SDL_LIBRARY SDL2::SDL2 SDL2::SDL2main)
+	endif()
+	find_package(PNG REQUIRED)
+	set(THREADS_PREFER_PTHREAD_FLAG ON)
+	find_package(Threads REQUIRED)
+	find_package(OpenAL REQUIRED)
 endif()
-find_package(PNG REQUIRED)
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
-find_package(OpenAL REQUIRED)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 	add_compile_options(-fvisibility=hidden)
@@ -96,6 +111,25 @@ if(SRR2_REROUTE_ALL_HEAP_ALLOCATIONS)
 endif()
 if(SRR2_USE_BINK)
 	add_definitions(-DRAD_MOVIEPLAYER_USE_BINK)
+elseif(EMSCRIPTEN)
+	# Movies (Bink .rmv) are decoded with FFmpeg compiled to WebAssembly.
+	# Build it with libs/radmovie/ffmpeg-wasm.sh (bink + ogg only) and point
+	# SRR2_FFMPEG_WASM_DIR at the resulting source/build tree.
+	set(SRR2_FFMPEG_WASM_DIR "/Users/iscle/ffmpeg-wasm-src" CACHE PATH "FFmpeg-for-wasm build tree (contains libav*/*.a)")
+	if(NOT EXISTS "${SRR2_FFMPEG_WASM_DIR}/libavcodec/libavcodec.a")
+		message(FATAL_ERROR "FFmpeg wasm libs not found in ${SRR2_FFMPEG_WASM_DIR} -- build FFmpeg for Emscripten first (see libs/radmovie/ffmpeg-wasm.sh)")
+	endif()
+	add_library(FFmpegWasm INTERFACE)
+	target_include_directories(FFmpegWasm INTERFACE "${SRR2_FFMPEG_WASM_DIR}")
+	# Link order: dependents before dependencies (avutil last).
+	target_link_libraries(FFmpegWasm INTERFACE
+		"${SRR2_FFMPEG_WASM_DIR}/libavformat/libavformat.a"
+		"${SRR2_FFMPEG_WASM_DIR}/libavcodec/libavcodec.a"
+		"${SRR2_FFMPEG_WASM_DIR}/libswscale/libswscale.a"
+		"${SRR2_FFMPEG_WASM_DIR}/libswresample/libswresample.a"
+		"${SRR2_FFMPEG_WASM_DIR}/libavutil/libavutil.a"
+	)
+	add_library(PkgConfig::FFmpeg ALIAS FFmpegWasm)
 else()
 	find_package(PkgConfig REQUIRED)
 	pkg_check_modules(FFmpeg REQUIRED IMPORTED_TARGET

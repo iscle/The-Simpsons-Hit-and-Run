@@ -103,7 +103,7 @@ if(SRR2_USE_BINK)
 else()
 	target_link_libraries(radmovie PkgConfig::FFmpeg)
 endif()
-if(SRR2_BUILD_TESTS)
+if(SRR2_BUILD_TESTS AND NOT EMSCRIPTEN)
 	add_executable(simplemovie "sample/src/main.cpp" "sample/src/util.cpp"
 		"${CMAKE_SOURCE_DIR}/code/main/tuidunaligned.cpp")
 	target_link_libraries(simplemovie

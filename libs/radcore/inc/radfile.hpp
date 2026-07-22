@@ -366,6 +366,13 @@ void radFileTerminate( void );
 void radFileService( void );
 
 //
+// Returns the total number of in-flight file requests across all drives.
+// Useful for burst-draining the loader (call radFileService in a loop while
+// this is non-zero) instead of advancing one completion per frame.
+//
+unsigned int radFileGetNumOutstandingRequests( void );
+
+//
 // This function can be used to specify what directory on a drive will be
 // used as the root directory for file and drive operations.
 // This is useful for placing an entire game in a subdirectory as on a demo disk. 

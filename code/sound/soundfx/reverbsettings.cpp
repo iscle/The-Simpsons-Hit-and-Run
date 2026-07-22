@@ -31,8 +31,6 @@
 //
 // Initialially the list is empty
 //
-template<> reverbSettings* radLinkedClass< reverbSettings >::s_pLinkedClassHead = NULL;
-template<> reverbSettings* radLinkedClass< reverbSettings >::s_pLinkedClassTail = NULL;
 
 //******************************************************************************
 //

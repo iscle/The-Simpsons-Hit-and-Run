@@ -220,11 +220,16 @@ void CGuiScreenSplash::HandleMessage
             }
             case GUI_MSG_CONTROLLER_SELECT:
             {
+#ifdef __EMSCRIPTEN__
+                // In the browser build Enter maps to accept (A), so let it
+                // advance the splash screen too by falling through to Start.
+#else
                 // ignore controller select inputs
                 //
                 return;
 
                 break;
+#endif
             }
             case GUI_MSG_CONTROLLER_START:
             {

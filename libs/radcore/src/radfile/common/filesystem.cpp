@@ -243,6 +243,35 @@ void radFileSystem::Service( void )
 }
 
 //=============================================================================
+// Function:    radFileSystem::GetNumOutstandingRequests
+//=============================================================================
+// Description: Total in-flight file requests across every mounted drive.
+//              Used to burst-drain the loader instead of processing one
+//              completion per frame (important on browser/WASM builds where
+//              the main loop is frame-driven).
+//------------------------------------------------------------------------------
+
+unsigned int radFileSystem::GetNumOutstandingRequests( void )
+{
+    if ( !s_Initialized )
+    {
+        return 0;
+    }
+
+    unsigned int total = 0;
+    Lock( );
+    for ( unsigned int i = 0; i < s_TotalDriveCount; i++ )
+    {
+        if ( s_DriveMap[ i ].m_pDrive != NULL )
+        {
+            total += s_DriveMap[ i ].m_pDrive->OutstandingRequests( );
+        }
+    }
+    Unlock( );
+    return total;
+}
+
+//=============================================================================
 // Function:    ProcessFileName
 //=============================================================================
 // Description: This routine takes a file name, splits it into a drive and

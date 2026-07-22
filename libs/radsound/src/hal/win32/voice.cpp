@@ -11,12 +11,22 @@
 #include "listener.hpp"
 #include "system.hpp"
 
+#ifdef __EMSCRIPTEN__
+// Queue-mode streaming emulation, implemented in system.cpp (Emscripten's
+// OpenAL cannot update a buffer attached to a playing source).
+extern void radEmStreamAttach( ALuint buffer, ALuint source );
+extern void radEmStreamDetach( ALuint buffer );
+extern void radEmStreamPlay( ALuint buffer );
+extern void radEmStreamStop( ALuint buffer );
+extern bool radEmStreamIsPlaying( ALuint buffer );
+extern unsigned int radEmStreamGetPositionFrames( ALuint buffer );
+extern void radEmStreamResetPosition( ALuint buffer );
+#endif
+
 //============================================================================
 // Static Initialization
 //============================================================================
 
-template<> radSoundHalVoiceWin * radLinkedClass<radSoundHalVoiceWin>::s_pLinkedClassHead = NULL;
-template<> radSoundHalVoiceWin * radLinkedClass<radSoundHalVoiceWin>::s_pLinkedClassTail = NULL;
 
 //========================================================================
 // radSoundHalVoiceWin::radSoundHalVoiceWin
@@ -78,6 +88,14 @@ unsigned int radSoundHalVoiceWin::GetPriority( void )
 
 void radSoundHalVoiceWin::SetBuffer( IRadSoundHalBuffer * pIRadSoundHalBuffer )
 {
+#ifdef __EMSCRIPTEN__
+    // Detach any previously attached streaming ring before switching buffers.
+    if ( m_xRadSoundHalBufferWin != NULL && m_xRadSoundHalBufferWin->IsStreaming( ) )
+    {
+        radEmStreamDetach( m_xRadSoundHalBufferWin->GetBuffer( ) );
+    }
+#endif
+
     Stop( );
 
     m_xRadSoundHalBufferWin = NULL;
@@ -90,6 +108,16 @@ void radSoundHalVoiceWin::SetBuffer( IRadSoundHalBuffer * pIRadSoundHalBuffer )
         m_xRadSoundHalBufferWin = static_cast< radSoundHalBufferWin * >( pIRadSoundHalBuffer );
         rAssert( m_xRadSoundHalBufferWin != NULL );
 
+#ifdef __EMSCRIPTEN__
+        if ( m_xRadSoundHalBufferWin->IsStreaming( ) )
+        {
+            // Queue mode: no static buffer attachment, no AL looping; regions
+            // written to the ring get queued on the source as they arrive.
+            alSourcei( m_Source, AL_BUFFER, 0 );
+            radEmStreamAttach( m_xRadSoundHalBufferWin->GetBuffer( ), m_Source );
+        }
+        else
+#endif
         alSourcei( m_Source, AL_BUFFER, m_xRadSoundHalBufferWin->GetBuffer() );
 
         // Now get the format of the buffer, we'll just store it here
@@ -107,6 +135,14 @@ void radSoundHalVoiceWin::SetBuffer( IRadSoundHalBuffer * pIRadSoundHalBuffer )
 			true
 		);
 
+#ifdef __EMSCRIPTEN__
+        if ( m_xRadSoundHalBufferWin->IsStreaming( ) )
+        {
+            // The ring loop is emulated by continuous chunk queueing.
+            alSourcei( m_Source, AL_LOOPING, AL_FALSE );
+        }
+        else
+#endif
         alSourcei( m_Source, AL_LOOPING, m_xRadSoundHalBufferWin->IsLooping() );
     }
     else
@@ -128,6 +164,13 @@ IRadSoundHalBuffer * radSoundHalVoiceWin::GetBuffer( void )
 
 void radSoundHalVoiceWin::Play( )
 {
+#ifdef __EMSCRIPTEN__
+    if ( m_xRadSoundHalBufferWin != NULL && m_xRadSoundHalBufferWin->IsStreaming( ) )
+    {
+        radEmStreamPlay( m_xRadSoundHalBufferWin->GetBuffer( ) );
+        return;
+    }
+#endif
     if (IsHardwarePlaying( ) == false)
     {
         alSourcePlay(m_Source);
@@ -155,6 +198,13 @@ void radSoundHalVoiceWin::Stop( void )
 
         rWarningMsg(alGetError() == AL_NO_ERROR, "radSoundHalVoiceWin::Stop failed");
     }
+
+#ifdef __EMSCRIPTEN__
+    if ( m_xRadSoundHalBufferWin != NULL && m_xRadSoundHalBufferWin->IsStreaming( ) )
+    {
+        radEmStreamStop( m_xRadSoundHalBufferWin->GetBuffer( ) );
+    }
+#endif
 }
 
 bool radSoundHalVoiceWin::IsPlaying( void )
@@ -164,6 +214,13 @@ bool radSoundHalVoiceWin::IsPlaying( void )
 
 unsigned int radSoundHalVoiceWin::GetPlaybackPositionInSamples( void )
 {
+#ifdef __EMSCRIPTEN__
+    if ( m_xRadSoundHalBufferWin != NULL && m_xRadSoundHalBufferWin->IsStreaming( ) )
+    {
+        return radEmStreamGetPositionFrames( m_xRadSoundHalBufferWin->GetBuffer( ) );
+    }
+#endif
+
     ALint currentPosition = 0;
     alGetSourcei( m_Source, AL_SAMPLE_OFFSET, &currentPosition );
     rWarningMsg(alGetError() == AL_NO_ERROR, "radSoundHalVoiceWin::GetPlaybackPositionInSamples failed");
@@ -173,6 +230,40 @@ unsigned int radSoundHalVoiceWin::GetPlaybackPositionInSamples( void )
 
 void radSoundHalVoiceWin::SetPlaybackPositionInSamples( unsigned int positionInSamples )
 {
+#ifdef __EMSCRIPTEN__
+    if ( m_xRadSoundHalBufferWin != NULL && m_xRadSoundHalBufferWin->IsStreaming( ) )
+    {
+        // Streams only ever seek back to the start (SetDataSource); flush the
+        // queue and restart the ring position from zero.
+        radEmStreamResetPosition( m_xRadSoundHalBufferWin->GetBuffer( ) );
+        return;
+    }
+
+    // Emscripten's OpenAL crashes seeking a source with no buffer attached,
+    // and its seek indexes the buffer queue with a cursor that stopped
+    // sources leave past the end. Skip the no-op seek and rewind first so
+    // the cursor is valid (openal-soft needs neither).
+    ALint attachedBuffer = 0;
+    alGetSourcei( m_Source, AL_BUFFER, &attachedBuffer );
+    alGetError();
+    if ( attachedBuffer == 0 )
+    {
+        return;
+    }
+
+    ALint state = 0;
+    alGetSourcei( m_Source, AL_SOURCE_STATE, &state );
+    alGetError();
+    if ( state != AL_PLAYING && state != AL_PAUSED )
+    {
+        alSourceRewind( m_Source );
+        alGetError();
+        if ( positionInSamples == 0 )
+        {
+            return;
+        }
+    }
+#endif
     alSourcei( m_Source, AL_SAMPLE_OFFSET, positionInSamples );
     rWarningMsg(alGetError() == AL_NO_ERROR, "radSoundHalVoiceWin::SetPlaybackPositionInSamples failed");
 }
@@ -290,6 +381,15 @@ void radSoundHalVoiceWin::SetAuxGain( unsigned int aux, float gain )
 
 bool radSoundHalVoiceWin::IsHardwarePlaying( void )
 {
+#ifdef __EMSCRIPTEN__
+    // A streaming source can momentarily underrun between queued chunks;
+    // report it as playing while the stream is logically active.
+    if ( m_xRadSoundHalBufferWin != NULL && m_xRadSoundHalBufferWin->IsStreaming( ) )
+    {
+        return radEmStreamIsPlaying( m_xRadSoundHalBufferWin->GetBuffer( ) );
+    }
+#endif
+
     ALint state;
     alGetSourcei(m_Source, AL_SOURCE_STATE, &state);
     rWarningMsg( alGetError() == AL_NO_ERROR, "radSoundHalVoiceWin::IsHardwarePlaying failed");

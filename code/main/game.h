@@ -92,7 +92,9 @@ class Game
         void Terminate();
 
         void Run();
+        void RunFrame();
         void Stop();
+        bool IsExiting() const { return mExitNow; };
         
         IRadTimerList* GetTimerList() { return mpTimerList; }
 
@@ -126,6 +128,7 @@ class Game
         RenderFlow*     mpRenderFlow;
         
         unsigned int mFrameCount;
+        unsigned    mLastFrameTime;
 
         bool        mExitNow;
 

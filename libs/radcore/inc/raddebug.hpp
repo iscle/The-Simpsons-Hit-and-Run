@@ -116,7 +116,12 @@ void rDebugSetOutputHandler     ( radDebugOutputHandler * pOutputProc );
 #endif
 
 //#define rReleaseString( x )( rDebugString_Implementation( x ) )
-#define rReleaseString( x )( (void)0 )
+#ifdef __EMSCRIPTEN__
+    // keep release prints visible in the browser console for diagnosis
+    #define rReleaseString( x )( rDebugString_Implementation( x ) )
+#else
+    #define rReleaseString( x )( (void)0 )
+#endif
 //
 // Always compile in release asserts.
 //

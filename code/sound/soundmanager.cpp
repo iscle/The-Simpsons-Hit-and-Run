@@ -180,7 +180,7 @@ void SoundManager::Update()
     
     if ( dif > BAD_SERVICE_TIME )
     {
-        #ifndef RAD_DEBUG
+        #if !defined( RAD_DEBUG ) && !defined( __EMSCRIPTEN__ )
             rReleasePrintf( "\nAUDIO: Detected Service Lag:[%d]ms -- this could cause skipping\n\n", dif );
         #endif
     }
@@ -218,7 +218,7 @@ void SoundManager::UpdateOncePerFrame( unsigned int elapsedTime, ContextEnum con
     
     if ( dif > BAD_SERVICE_TIME )
     {
-        #ifndef RAD_DEBUG
+        #if !defined( RAD_DEBUG ) && !defined( __EMSCRIPTEN__ )
             rReleasePrintf( "\nAUDIO: Detected ServiceOpf Lag:[%d]ms -- this could cause skipping\n\n", dif );
         #endif
     }

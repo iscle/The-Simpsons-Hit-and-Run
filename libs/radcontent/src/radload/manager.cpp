@@ -7,6 +7,9 @@
 #include <radload/utility/hashtable.hpp>
 #include <radload/utility/queue.hpp>
 #include <radfile.hpp>
+#ifdef __EMSCRIPTEN__
+#include <raddebug.hpp>
+#endif
 
 #ifdef RADLOAD_USE_WATCHER
 #include <raddebugwatch.hpp>
@@ -15,6 +18,16 @@
 radLoadManagerWrapper radLoad;
 
 ILoadManager* ILoadManager::s_instance = NULL;
+
+#ifdef __EMSCRIPTEN__
+//
+// True while a queued item's LoadFile is being processed on the main thread.
+// A loader can call back into Service()/Load() while waiting for file I/O;
+// reentering the queue there would fire completion callbacks before the outer
+// load finished, so nested calls only pump the file system.
+//
+static bool s_radLoadProcessing = false;
+#endif
 
 void radLoadInitialize( radLoadInit* init )
 {
@@ -78,8 +91,17 @@ m_pMutex( NULL )
     m_pCallbacks ->AddRef();
 
     ::radThreadCreateMutex( &m_pMutex );
+#ifdef __EMSCRIPTEN__
+    //
+    // No load worker thread in the browser build: the engine's loader is not
+    // thread-safe and WebGL is main-thread only, so loads run cooperatively
+    // on the main thread (driven from Service()). Leave the mutex unlocked.
+    //
+    (void)0;
+#else
     m_pMutex->Lock();
     ::radThreadCreateThread( &m_pThread, radLoadManager::LoadThreadEntry, static_cast<void*>(this), IRadThread::PriorityNormal, init.loadThreadStackSize );
+#endif
 
 #ifdef RADLOAD_GATHER_STATS
 #ifdef RADLOAD_USE_WATCHER
@@ -169,7 +191,22 @@ void radLoadManager::InternalService()
     m_pMutex->Lock();
     while( !m_bDone )
     {
-        if( !m_pLoadQueue->Empty() )
+        if( !ProcessOneQueueItem() )
+        {
+            SwitchTasks();
+        }
+    }
+    m_pMutex->Unlock();
+}
+
+bool radLoadManager::ProcessOneQueueItem()
+{
+    if( m_pLoadQueue->Empty() )
+    {
+        return false;
+    }
+
+    {
         {
             radLoadObject* obj = m_pLoadQueue->Pop();
             radLoadCallback* callback = dynamic_cast<radLoadCallback*>( obj );
@@ -182,6 +219,11 @@ void radLoadManager::InternalService()
                 QueueItem* item = dynamic_cast<QueueItem*>(obj);
                 if( item )
                 {
+                    // A loader's LoadFile can issue nested sync loads that
+                    // re-enter this function on the same thread, so preserve
+                    // the outer in-flight item.
+                    QueueItem* pPreviousCurrent = m_pCurrent;
+
                     m_pCurrent = item;
                     m_pCurrent->AddRef();
                     m_pCurrent->SetState( LOADING );
@@ -209,7 +251,7 @@ void radLoadManager::InternalService()
                     radMemoryAllocator old = ::radMemorySetCurrentAllocator (item->GetOptions()->allocator);
 
                     loader->LoadFile( item->GetOptions(), static_cast<radLoadUpdatableRequest*>( item ) );
-                    
+
                     ::radMemorySetCurrentAllocator (old);
                     if( m_pCurrent->GetState() == LOADING )
                     {
@@ -235,15 +277,13 @@ void radLoadManager::InternalService()
                     m_pendingLoads--;
     #endif
                     radLoadObject::Release( m_pCurrent );
+                    m_pCurrent = pPreviousCurrent;
                 }
             }
         }
-        else
-        {
-            SwitchTasks();
-        }
     }
-    m_pMutex->Unlock();
+
+    return true;
 }
 
 bool radLoadManager::IsLoadPending()
@@ -281,7 +321,26 @@ void radLoadManager::Load( radLoadOptions* options, radLoadRequest** request )
     {
         while( item->GetState() != COMPLETE )
         {
+#ifdef __EMSCRIPTEN__
+            // No worker thread: process the queue on the main thread. This
+            // must run even when nested inside another LoadFile
+            // (ProcessOneQueueItem preserves the outer in-flight item), or a
+            // nested sync load would never complete. Keep the flag raised so
+            // incidental Service() calls from loaders stay no-ops and don't
+            // fire queued callbacks early.
+            bool wasProcessing = s_radLoadProcessing;
+            s_radLoadProcessing = true;
+            m_pMutex->Lock();
+            bool processed = ProcessOneQueueItem();
+            m_pMutex->Unlock();
+            s_radLoadProcessing = wasProcessing;
+            if( !processed )
+            {
+                radThreadSleep( 0 );
+            }
+#else
             SwitchTasks();
+#endif
             radFileService();
         }
     }
@@ -363,10 +422,30 @@ void radLoadManager::RemoveFileLoader( radLoadFileLoader* loader )
 
 void radLoadManager::Service()
 {
+#ifdef __EMSCRIPTEN__
+    //
+    // No worker thread: process the load queue here on the main thread. A
+    // loader's LoadFile can re-enter Service() while waiting for file I/O; in
+    // that nested case only pump the file system so the pending read
+    // completes, and leave the queue (and its completion callbacks) alone.
+    //
+    if( s_radLoadProcessing )
+    {
+        ::radFileService();
+        ::radThreadSleep( 0 );
+        return;
+    }
+    s_radLoadProcessing = true;
+    m_pMutex->Lock();
+    ProcessOneQueueItem();
+    m_pMutex->Unlock();
+    s_radLoadProcessing = false;
+#else
     if( IsLoadPending() )
     {
         SwitchTasks();
     }
+#endif
 
     if(!m_pCallbacks->Empty())
     {
@@ -385,9 +464,21 @@ void radLoadManager::SetSyncLoading( bool sync )
 
 void radLoadManager::SwitchTasks()
 {
+#ifdef __EMSCRIPTEN__
+    //
+    // Single-threaded loading: loaders spin on SwitchTasks() while waiting
+    // for async file I/O (e.g. radLoadFileStream::WaitForCompletion).  On
+    // native builds the main thread pumps radFileService() concurrently, but
+    // here we ARE the main thread, so pump the file system ourselves or the
+    // wait never completes.
+    //
+    ::radFileService();
+    radThreadSleep(0);
+#else
     m_pMutex->Unlock();
     radThreadSleep(0);
     m_pMutex->Lock();
+#endif
 }
 
 void radLoadManager::Terminate()
@@ -398,9 +489,11 @@ void radLoadManager::Terminate()
     m_pLoadQueue->Release();
     m_pCallbacks->Release();
     m_bDone = true;
+#ifndef __EMSCRIPTEN__
     m_pMutex->Unlock();
     m_pThread->WaitForTermination();
     m_pThread->Release();
+#endif
 
     m_pMutex->Release();
 

@@ -20,8 +20,6 @@ const unsigned int RADSOUNDHAL_BUFFER_CHANNEL_ALIGNMENT = 1;
 // Static Initialization
 //============================================================================
 
-template<> radSoundHalBufferWin * radLinkedClass<radSoundHalBufferWin>::s_pLinkedClassHead = NULL;
-template<> radSoundHalBufferWin * radLinkedClass<radSoundHalBufferWin>::s_pLinkedClassTail = NULL;
 
 //========================================================================
 // radSoundHalBufferWin::~radSoundHalBufferWin
@@ -31,6 +29,10 @@ radSoundHalBufferWin::~radSoundHalBufferWin( void )
 {
     if (m_Buffer)
     {
+#ifdef __EMSCRIPTEN__
+        extern void radEmForgetBuffer( ALuint buffer );
+        radEmForgetBuffer( m_Buffer );
+#endif
         alDeleteBuffers(1, &m_Buffer);
     }
 }
@@ -131,6 +133,12 @@ void radSoundHalBufferWin::ClearAsync
 
         if( m_Streaming == true )
         {
+#ifdef __EMSCRIPTEN__
+            // Clears only scrub stale ring contents; in queue mode nothing
+            // stale can play back, so don't queue the silence as audio.
+            extern void radEmBufferSetQueueSuppressed( ALuint buffer, bool suppressed );
+            radEmBufferSetQueueSuppressed( m_Buffer, true );
+#endif
             void* dataPtr = radMapBufferSOFT( m_Buffer, offsetInBytes, sizeInBytes, AL_MAP_WRITE_BIT_SOFT | AL_MAP_PERSISTENT_BIT_SOFT );
 
             rAssertMsg( alGetError() == AL_NO_ERROR, "radSoundHalBufferWin::Clear - Lock Failed.\n" );
@@ -143,6 +151,9 @@ void radSoundHalBufferWin::ClearAsync
 
                 rAssertMsg( alGetError() == AL_NO_ERROR, "radSoundHalBufferWin::Clear - UnLock Failed.\n" );
             }
+#ifdef __EMSCRIPTEN__
+            radEmBufferSetQueueSuppressed( m_Buffer, false );
+#endif
         }
         else
         {
@@ -330,7 +341,15 @@ void radSoundHalBufferWin::CancelAsyncOperations( void )
     {
         if( m_Streaming == true )
         {
+#ifdef __EMSCRIPTEN__
+            // The cancelled region holds incomplete data; don't queue it.
+            extern void radEmBufferSetQueueSuppressed( ALuint buffer, bool suppressed );
+            radEmBufferSetQueueSuppressed( m_Buffer, true );
             radUnmapBufferSOFT( m_Buffer );
+            radEmBufferSetQueueSuppressed( m_Buffer, false );
+#else
+            radUnmapBufferSOFT( m_Buffer );
+#endif
             rAssert( alGetError() == AL_NO_ERROR );
         }
 

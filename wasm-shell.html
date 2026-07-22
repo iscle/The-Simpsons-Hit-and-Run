@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Adds COOP/COEP so SharedArrayBuffer (the game's threads) works on hosts
+       that can't set headers, e.g. GitHub Pages. Must load before everything
+       else; it reloads the page once on first visit to gain isolation. -->
+  <script>window.coi = { quiet: true };</script>
+  <script src="coi-serviceworker.js"></script>
+  <title>The Simpsons: Hit &amp; Run</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: system-ui, sans-serif;
+    }
+    #game {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+    }
+    /* The drawing buffer stays at the game's internal resolution; CSS scales
+       the canvas to fit while preserving aspect, in and out of fullscreen. */
+    canvas.emscripten {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #000;
+      image-rendering: auto;
+      border: 0;
+      outline: none;
+    }
+    #hud {
+      position: fixed;
+      top: 10px;
+      right: 12px;
+      z-index: 10;
+      opacity: 0.35;
+      transition: opacity 0.15s;
+    }
+    #hud:hover { opacity: 1; }
+    #hud button {
+      background: rgba(20, 20, 20, 0.8);
+      color: #eee;
+      border: 1px solid #555;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    #hud button:hover { background: rgba(60, 60, 60, 0.9); }
+    #overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      background: #000;
+      color: #ddd;
+      transition: opacity 0.4s;
+    }
+    #overlay.hidden { opacity: 0; pointer-events: none; }
+    #overlay h1 { font-size: 20px; font-weight: 600; margin: 0; color: #ffd90f; }
+    #status { font-size: 14px; color: #aaa; min-height: 1.2em; }
+    #barwrap {
+      width: min(420px, 80vw);
+      height: 8px;
+      background: #222;
+      border-radius: 4px;
+      overflow: hidden;
+      visibility: hidden;
+    }
+    #bar { width: 0%; height: 100%; background: #ffd90f; transition: width 0.15s; }
+    #hint { font-size: 12px; color: #666; max-width: min(460px, 85vw); text-align: center; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+  </div>
+  <div id="hud">
+    <button id="fsbtn" type="button">Fullscreen</button>
+  </div>
+  <div id="overlay">
+    <h1>The Simpsons: Hit &amp; Run</h1>
+    <div id="status">Loading...</div>
+    <div id="barwrap"><div id="bar"></div></div>
+    <div id="hint">
+      Game data streams from the server as needed.<br>
+      Keyboard: arrows/WASD move &middot; Enter = accept &middot; Esc = pause/back &middot; Space = jump
+    </div>
+  </div>
+
+  <script>
+    var statusElement = document.getElementById('status');
+    var overlayElement = document.getElementById('overlay');
+    var barElement = document.getElementById('bar');
+    var barwrapElement = document.getElementById('barwrap');
+    var gameStarted = false;
+
+    document.getElementById('fsbtn').addEventListener('click', function () {
+      // Fullscreen the wrapper via the browser API only: the canvas keeps its
+      // drawing-buffer size and is scaled by CSS, so the game is unaffected.
+      var game = document.getElementById('game');
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else if (game.requestFullscreen) {
+        game.requestFullscreen();
+      } else if (game.webkitRequestFullscreen) {
+        game.webkitRequestFullscreen();
+      }
+    });
+
+    // --- Persistent save games (IndexedDB-backed) -------------------------
+    // The game writes Save1..Save4 to the in-memory filesystem. We mirror
+    // those to IndexedDB on write and restore them into the FS before the
+    // game boots, so saves survive page reloads.
+    var SAVE_DB = 'shar_saves';
+    var SAVE_STORE = 'files';
+
+    function saveDbOpen() {
+      return new Promise(function (resolve, reject) {
+        var req = indexedDB.open(SAVE_DB, 1);
+        req.onupgradeneeded = function () {
+          req.result.createObjectStore(SAVE_STORE);
+        };
+        req.onsuccess = function () { resolve(req.result); };
+        req.onerror = function () { reject(req.error); };
+      });
+    }
+
+    function saveDbPutAll(entries) {
+      return saveDbOpen().then(function (db) {
+        return new Promise(function (resolve) {
+          var tx = db.transaction(SAVE_STORE, 'readwrite');
+          var store = tx.objectStore(SAVE_STORE);
+          entries.forEach(function (e) { store.put(e.data, e.path); });
+          tx.oncomplete = function () { db.close(); resolve(); };
+          tx.onerror = function () { db.close(); resolve(); };
+        });
+      });
+    }
+
+    function saveDbGetAll() {
+      return saveDbOpen().then(function (db) {
+        return new Promise(function (resolve) {
+          var out = [];
+          var tx = db.transaction(SAVE_STORE, 'readonly');
+          var store = tx.objectStore(SAVE_STORE);
+          var cur = store.openCursor();
+          cur.onsuccess = function () {
+            var c = cur.result;
+            if (c) { out.push({ path: c.key, data: c.value }); c.continue(); }
+            else { db.close(); resolve(out); }
+          };
+          cur.onerror = function () { db.close(); resolve(out); };
+        });
+      });
+    }
+
+    var Module = {
+      // Where the game streams its ~1.8GB of assets from. Defaults to the same
+      // origin ("/assets/"), but can be pointed at a separate host with a
+      // ?assets=<url> query param, so this build can be served from a place
+      // that can't host the data itself (e.g. GitHub Pages). The asset host
+      // must support HTTP Range requests and send permissive CORS headers.
+      assetBaseUrl: (function () {
+        var q = new URLSearchParams(location.search).get('assets');
+        if (!q) return '/assets/';
+        try { q = decodeURIComponent(q); } catch (e) {}
+        if (q.charAt(q.length - 1) !== '/') q += '/';
+        return q;
+      })(),
+      canvas: (function () {
+        var canvas = document.getElementById('canvas');
+        canvas.addEventListener('webglcontextlost', function (e) {
+          alert('WebGL context lost. Please reload the page.');
+          e.preventDefault();
+        }, false);
+        return canvas;
+      })(),
+      // Read persisted saves from IndexedDB into memory before the runtime
+      // initializes. This is JS-only (no wasm/malloc, which isn't ready yet);
+      // the files are written into the FS in onRuntimeInitialized below.
+      preRun: [function () {
+        Module.addRunDependency('read-saves');
+        saveDbGetAll().then(function (entries) {
+          Module.__pendingSaves = entries;
+        }).catch(function () {
+          Module.__pendingSaves = [];
+        }).then(function () {
+          Module.removeRunDependency('read-saves');
+        });
+      }],
+      // Called from the game's startup (win32main.cpp) once the runtime and
+      // filesystem are fully up: write the saves read in preRun into the FS
+      // so the game finds them. (Doing FS writes any earlier -- preRun or
+      // onRuntimeInitialized -- aborts in the pthreaded WASMFS build.)
+      flushPendingSaves: function () {
+        var entries = Module.__pendingSaves || [];
+        entries.forEach(function (e) {
+          try { Module.FS.writeFile(e.path, e.data); } catch (err) {}
+        });
+        Module.__pendingSaves = [];
+      },
+      // Called from the game (sdldrive.cpp) after a save file is written.
+      persistSave: function (path) {
+        try {
+          var data = Module.FS.readFile(path); // Uint8Array
+          saveDbPutAll([{ path: path, data: data }]);
+          Module.__lastSaveTime = (performance && performance.now) ? performance.now() : 0;
+        } catch (err) {}
+      },
+      // Called from the game (game.cpp) on transitions in/out of active
+      // gameplay. Drives the "unsaved progress" close warning below.
+      setGameplayActive: function (active) {
+        Module.__gameplayActive = !!active;
+      },
+      setStatus: function (text) {
+        if (gameStarted) return;
+        var m = text && text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+        if (m) {
+          var frac = parseInt(m[2]) / parseInt(m[4]);
+          barwrapElement.style.visibility = 'visible';
+          barElement.style.width = (frac * 100).toFixed(1) + '%';
+          statusElement.textContent = 'Downloading — ' + (frac * 100).toFixed(0) + '%';
+        } else if (text) {
+          statusElement.textContent = text;
+        } else {
+          // Runtime is up; the game is now booting and streaming assets. Keep
+          // the overlay and switch to the boot progress bar (driven by
+          // Module.setBootProgress from the game).
+          statusElement.textContent = 'Loading game...';
+          barwrapElement.style.visibility = 'visible';
+        }
+      },
+      // Called from the game (game.cpp) as boot proceeds: p in [0, 1].
+      setBootProgress: function (p) {
+        if (gameStarted) return;
+        var pct = Math.max(0, Math.min(1, p));
+        barwrapElement.style.visibility = 'visible';
+        barElement.style.width = (pct * 100).toFixed(1) + '%';
+        statusElement.textContent = 'Loading game — ' + Math.floor(pct * 100) + '%';
+        if (pct >= 1) {
+          gameStarted = true;
+          overlayElement.classList.add('hidden');
+        }
+      },
+      monitorRunDependencies: function () {}
+    };
+
+    // Keys the game uses that browsers would otherwise act on themselves
+    // (F1 help, Tab focus-cycle, Space/arrows page-scroll).
+    window.addEventListener('keydown', function (e) {
+      switch (e.key) {
+        case 'F1': case 'Tab': case ' ': case 'Spacebar':
+        case 'ArrowUp': case 'ArrowDown': case 'ArrowLeft': case 'ArrowRight':
+          e.preventDefault();
+      }
+    });
+    // The game reads the mouse as an action button; don't pop the context menu.
+    document.getElementById('canvas').addEventListener('contextmenu', function (e) {
+      e.preventDefault();
+    });
+
+    // Warn before closing the tab if the player is mid-gameplay and hasn't
+    // saved recently, so progress isn't lost. Saves happen at mission/level
+    // checkpoints (persistSave records the time); we stay quiet in menus and
+    // for ~90s after a save.
+    window.addEventListener('beforeunload', function (e) {
+      if (!Module.__gameplayActive) return;
+      var now = (performance && performance.now) ? performance.now() : 0;
+      var savedRecently = Module.__lastSaveTime && (now - Module.__lastSaveTime) < 90000;
+      if (savedRecently) return;
+      e.preventDefault();
+      e.returnValue = ''; // required for the browser's generic unsaved-changes prompt
+      return '';
+    });
+
+    window.onerror = function (message) {
+      statusElement.textContent = 'Error: ' + message + ' (see console)';
+      overlayElement.classList.remove('hidden');
+    };
+  </script>
+  {{{ SCRIPT }}}
+</body>
+</html>

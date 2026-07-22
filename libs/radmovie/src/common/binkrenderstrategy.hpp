@@ -45,7 +45,9 @@
 // across many textures to keep texture dimensions smaller than RMV_TEXTURE_MAX_TEX_DIM)
 // This value limits the maximum movies (and can be changed if necessary.)
 
-#ifdef RAD_MOVIEPLAYER_USE_BINK
+#if defined RAD_MOVIEPLAYER_USE_BINK || !defined RAD_VITA
+// Movies larger than RMV_TEXTURE_MAX_TEX_DIM are split across a grid of
+// textures; a 1024px tile size allows frames up to ~3072x3072 (9 tiles).
 #define RMV_MAX_NUM_TILES 9
 #else
 #define RMV_MAX_NUM_TILES 1

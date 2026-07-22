@@ -40,6 +40,77 @@ extern "C"
     #include <libswresample/swresample.h>
 }
 
+#ifdef __EMSCRIPTEN__
+#include <radfile.hpp>
+
+//=============================================================================
+// radFile-backed AVIO (browser build)
+//=============================================================================
+//
+// Movies are streamed over HTTP through the game's file system, so FFmpeg
+// reads them via these callbacks (which drive an IRadFile) rather than its
+// own file protocol.
+//
+
+namespace
+{
+    const int kRadAvioBufferSize = 64 * 1024;
+
+    int radAvioReadPacket( void* opaque, uint8_t* buf, int bufSize )
+    {
+        IRadFile* pFile = static_cast< IRadFile* >( opaque );
+        unsigned int size = pFile->GetSize( );
+        unsigned int pos = 0;
+        pFile->GetPositionSync( &pos );
+        if ( pos >= size )
+        {
+            return AVERROR_EOF;
+        }
+        unsigned int toRead = ( unsigned int ) bufSize;
+        if ( toRead > size - pos )
+        {
+            toRead = size - pos;
+        }
+        pFile->ReadSync( buf, toRead );
+        return ( int ) toRead;
+    }
+
+    int64_t radAvioSeek( void* opaque, int64_t offset, int whence )
+    {
+        IRadFile* pFile = static_cast< IRadFile* >( opaque );
+        unsigned int size = pFile->GetSize( );
+
+        if ( whence == AVSEEK_SIZE )
+        {
+            return ( int64_t ) size;
+        }
+
+        int64_t newPos;
+        if ( whence == SEEK_SET )
+        {
+            newPos = offset;
+        }
+        else if ( whence == SEEK_CUR )
+        {
+            unsigned int cur = 0;
+            pFile->GetPositionSync( &cur );
+            newPos = ( int64_t ) cur + offset;
+        }
+        else // SEEK_END
+        {
+            newPos = ( int64_t ) size + offset;
+        }
+
+        if ( newPos < 0 )
+        {
+            newPos = 0;
+        }
+        pFile->SetPositionSync( ( unsigned int ) newPos );
+        return newPos;
+    }
+}
+#endif // __EMSCRIPTEN__
+
 //=============================================================================
 // Constants
 //=============================================================================
@@ -72,8 +143,6 @@ unsigned int const radMovie_NoAudioTrack = 0xFFFFFFFF;
 // Static Members
 //=============================================================================
 
-template<> radMoviePlayer* radLinkedClass< radMoviePlayer >::s_pLinkedClassHead = NULL;
-template<> radMoviePlayer* radLinkedClass< radMoviePlayer >::s_pLinkedClassTail = NULL;
 
 //=============================================================================
 // Public Member Functions
@@ -104,6 +173,11 @@ radMoviePlayer::radMoviePlayer( void )
     m_pVideoFrame( NULL ),
     m_pAudioFrame( NULL ),
     m_AudioSource( 0 )
+#ifdef __EMSCRIPTEN__
+    , m_pAvioCtx( NULL )
+    , m_pAvioRadFile( NULL )
+    , m_pAvioBuffer( NULL )
+#endif
 {
     radTimeCreateStopwatch( &m_refIRadStopwatch, radTimeUnit_Millisecond, GetThisAllocator( ) );
 }
@@ -198,12 +272,67 @@ void radMoviePlayer::Load( const char * pVideoFileName, unsigned int audioTrackI
     SetState( IRadMoviePlayer2::Loading );
 
     m_pFormatCtx = avformat_alloc_context();
+
+#ifdef __EMSCRIPTEN__
+    //
+    // Open the movie through the game's file system (HTTP-streamed) and let
+    // FFmpeg read it via a custom AVIO context.
+    //
+    IRadFile* pMovieFile = NULL;
+    ::radFileOpenSync( &pMovieFile, pVideoFileName );
+    if ( pMovieFile == NULL )
+    {
+        rDebugPrintf( "radMoviePlayer: could not open %s\n", pVideoFileName );
+        SetState( IRadMoviePlayer2::NoData );
+        return;
+    }
+    pMovieFile->AddRef( );
+    pMovieFile->SetPositionSync( 0 );
+
+    m_pAvioRadFile = pMovieFile;
+    m_pAvioBuffer = ( unsigned char* ) av_malloc( kRadAvioBufferSize );
+    m_pAvioCtx = avio_alloc_context(
+        m_pAvioBuffer, kRadAvioBufferSize, 0,
+        pMovieFile, radAvioReadPacket, NULL, radAvioSeek );
+    m_pFormatCtx->pb = m_pAvioCtx;
+    m_pFormatCtx->flags |= AVFMT_FLAG_CUSTOM_IO;
+
+    AV_CHK( avformat_open_input( &m_pFormatCtx, NULL, NULL, NULL ) );
+#else
     AV_CHK( avformat_open_input( &m_pFormatCtx, pVideoFileName, NULL, NULL ) );
+#endif
     AV_CHK( avformat_find_stream_info( m_pFormatCtx, NULL ) );
 
     const AVCodec* pVideoCodec = NULL;
-    m_VideoTrackIndex = av_find_best_stream( m_pFormatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, &pVideoCodec, 0 );
+    int videoStream = av_find_best_stream( m_pFormatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, &pVideoCodec, 0 );
+    if ( videoStream < 0 || pVideoCodec == NULL )
+    {
+        // No decodable video track (e.g. the placeholder Ogg logo files).
+        // Treat as an empty movie so playback finishes immediately rather
+        // than indexing streams[] with a negative index.
+        rDebugPrintf( "radMoviePlayer: no video stream in %s\n", pVideoFileName );
+        Unload( );
+        SetState( IRadMoviePlayer2::NoData );
+        return;
+    }
+    m_VideoTrackIndex = ( unsigned int ) videoStream;
     AVCodecParameters* pVideoParams = m_pFormatCtx->streams[m_VideoTrackIndex]->codecpar;
+
+    //
+    // Reject bogus dimensions (the placeholder Ogg logo files decode to
+    // garbage sizes). The render strategy tiles the frame into a fixed-size
+    // texture array and would otherwise overflow it.
+    //
+    if ( pVideoParams->width <= 0 || pVideoParams->height <= 0 ||
+         pVideoParams->width > 2048 || pVideoParams->height > 2048 )
+    {
+        rDebugPrintf( "radMoviePlayer: unsupported video dimensions %dx%d in %s\n",
+            pVideoParams->width, pVideoParams->height, pVideoFileName );
+        Unload( );
+        SetState( IRadMoviePlayer2::NoData );
+        return;
+    }
+
     m_pVideoCtx = avcodec_alloc_context3( pVideoCodec );
     AV_CHK( avcodec_parameters_to_context( m_pVideoCtx, pVideoParams ) );
     AV_CHK( avcodec_open2( m_pVideoCtx, pVideoCodec, NULL ) );
@@ -215,15 +344,27 @@ void radMoviePlayer::Load( const char * pVideoFileName, unsigned int audioTrackI
         AV_PIX_FMT_YUV420P,
         pVideoParams->width,
         pVideoParams->height,
+#ifdef __EMSCRIPTEN__
+        // The tile texture is created as PDDI_TEXTYPE_RGB (RAD_WIN32 path). On
+        // native D3D that is BGRA byte order, but the WebGL/GLES2 pddi uploads
+        // it as GL_RGBA, so we must hand swscale RGBA or R/B come out swapped.
+        AV_PIX_FMT_RGBA,
+#else
         AV_PIX_FMT_BGRA,
+#endif
         0, NULL, NULL, NULL
     );
 #endif
 
+    const AVCodec* pAudioCodec = NULL;
+    int audioStream = -1;
     if( audioTrackIndex != radMovie_NoAudioTrack )
     {
-        const AVCodec* pAudioCodec = NULL;
-        m_AudioTrackIndex = av_find_best_stream( m_pFormatCtx, AVMEDIA_TYPE_AUDIO, audioTrackIndex + 1, -1, &pAudioCodec, 0 );
+        audioStream = av_find_best_stream( m_pFormatCtx, AVMEDIA_TYPE_AUDIO, audioTrackIndex + 1, -1, &pAudioCodec, 0 );
+    }
+    if( audioStream >= 0 && pAudioCodec != NULL )
+    {
+        m_AudioTrackIndex = ( unsigned int ) audioStream;
         AVCodecParameters* pAudioParams = m_pFormatCtx->streams[m_AudioTrackIndex]->codecpar;
         m_pAudioCtx = avcodec_alloc_context3( pAudioCodec );
         AV_CHK( avcodec_parameters_to_context( m_pAudioCtx, pAudioParams ) );
@@ -300,6 +441,21 @@ void radMoviePlayer::Unload( void )
         avcodec_free_context( &m_pAudioCtx );
         avformat_close_input( &m_pFormatCtx );
         avformat_free_context( m_pFormatCtx );
+
+#ifdef __EMSCRIPTEN__
+        if ( m_pAvioCtx != NULL )
+        {
+            // FFmpeg may have reallocated the buffer; free via the context.
+            av_freep( &m_pAvioCtx->buffer );
+            avio_context_free( &m_pAvioCtx );
+            m_pAvioBuffer = NULL;
+        }
+        if ( m_pAvioRadFile != NULL )
+        {
+            static_cast< IRadFile* >( m_pAvioRadFile )->Release( );
+            m_pAvioRadFile = NULL;
+        }
+#endif
 
         m_refIRadStopwatch->Stop( );
         m_refIRadStopwatch->Reset( );

@@ -28,8 +28,6 @@
 // Static Variables (outside namespace)
 //=============================================================================
 
-template<> Sound::daSoundDynaLoadRegion* radLinkedClass< Sound::daSoundDynaLoadRegion >::s_pLinkedClassHead = NULL;
-template<> Sound::daSoundDynaLoadRegion* radLinkedClass< Sound::daSoundDynaLoadRegion >::s_pLinkedClassTail = NULL;
 
 //=============================================================================
 // Namespace

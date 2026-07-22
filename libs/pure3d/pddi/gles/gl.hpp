@@ -11,6 +11,12 @@
 #include <glad/glad.h>
 #endif
 
+#ifdef __EMSCRIPTEN__
+// Emscripten's OFFSCREEN_FRAMEBUFFER GL proxying (used with PROXY_TO_PTHREAD)
+// does not implement the OES vertex array object extension.
+#define PDDI_NO_VAO 1
+#endif
+
 #if defined(RAD_VITAGL) || defined(RAD_CG)
 #undef glDepthRangef
 #undef glClearDepthf

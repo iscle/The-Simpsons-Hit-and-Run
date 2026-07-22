@@ -130,8 +130,18 @@ void pglTexture::SetGLState(void)
 #endif
         else
         {
-            glTexImage2D(GL_TEXTURE_2D, 0, PickPixelFormat(lock.format), xSize,
-                ySize, 0, lock.native ? GL_BGRA_EXT : GL_RGBA, GL_UNSIGNED_BYTE,
+            // GLES2 requires internalformat == format; without the BGRA
+            // extension the lock shifts swizzle 32-bit texel data to RGBA.
+            // Other depths keep the (invalid) PickPixelFormat enum so the
+            // upload stays a no-op instead of overreading the smaller buffer.
+            GLenum texFormat = PickPixelFormat(lock.format);
+            if(!lock.native &&
+                (lock.format == PDDI_PIXEL_RGB888 || lock.format == PDDI_PIXEL_ARGB8888))
+            {
+                texFormat = GL_RGBA;
+            }
+            glTexImage2D(GL_TEXTURE_2D, 0, texFormat, xSize,
+                ySize, 0, texFormat, GL_UNSIGNED_BYTE,
                 (GLvoid *)bits[0]);
         }
         /*

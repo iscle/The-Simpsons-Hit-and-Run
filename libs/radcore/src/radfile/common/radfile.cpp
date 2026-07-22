@@ -253,6 +253,15 @@ void radFileService( void )
     radFileSystem::Service( );
 }
 
+//=============================================================================
+// Function:    radFileGetNumOutstandingRequests
+//=============================================================================
+
+unsigned int radFileGetNumOutstandingRequests( void )
+{
+    return radFileSystem::GetNumOutstandingRequests( );
+}
+
 
 //=============================================================================
 // Function:    radFileSetRootDirectory

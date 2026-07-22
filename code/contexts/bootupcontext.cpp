@@ -188,6 +188,12 @@ void BootupContext::StartMovies()
         }
         else
         {
+#ifdef __EMSCRIPTEN__
+            // The boot logo movies in this asset set are broken placeholders
+            // (a bogus header claiming a large resolution but no frame data),
+            // which crash the decoder. Skip straight to the frontend.
+            GetGameFlow()->SetContext( CONTEXT_FRONTEND );
+#else
             FMVEvent* pEvent = 0;
 
             GetPresentationManager()->QueueFMV( &pEvent, this );
@@ -219,6 +225,7 @@ void BootupContext::StartMovies()
             pEvent->SetClearWhenDone( true );
 
             GetRenderManager()->mpLayer( RenderEnums::GUI )->Chill();
+#endif // !__EMSCRIPTEN__
         }
 #else
         // Switch to frontend context.

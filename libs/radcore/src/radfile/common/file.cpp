@@ -677,7 +677,11 @@ void radFile::WaitForCompletion( void )
     while ( !CheckForCompletion( ) )
     {
         m_pDrive->Service( );
-//        radThreadSleep(0);
+#ifdef __EMSCRIPTEN__
+        // A bare spin starves the browser main thread's proxied-syscall
+        // queue, deadlocking the drive thread; sleeping drains the queue.
+        radThreadSleep(0);
+#endif
     }
 }
 

@@ -29,8 +29,6 @@
 //
 // Initialially the list is empty
 //
-template<> SoundRenderingPlayerCallback* radLinkedClass< SoundRenderingPlayerCallback >::s_pLinkedClassHead = NULL;
-template<> SoundRenderingPlayerCallback* radLinkedClass< SoundRenderingPlayerCallback >::s_pLinkedClassTail = NULL;
 
 //******************************************************************************
 //

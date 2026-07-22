@@ -21,6 +21,10 @@
 #include <stdio.h>
 #include <SDL_main.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 #ifdef __SWITCH__
 #include <switch.h>
 #endif
@@ -113,6 +117,15 @@ extern "C" int main( int argc, char *argv[] )
         return 0;
     }
     Win32Platform::InitializeFoundation();
+
+#ifdef __EMSCRIPTEN__
+    //
+    // The runtime and filesystem are fully up now (the drive is mounted), so
+    // restore persisted save games (read from IndexedDB during preRun) into
+    // the filesystem before the game reads them.
+    //
+    MAIN_THREAD_EM_ASM( { if ( Module.flushPendingSaves ) Module.flushPendingSaves(); } );
+#endif
 
     srand (Game::GetRandomSeed ());
 

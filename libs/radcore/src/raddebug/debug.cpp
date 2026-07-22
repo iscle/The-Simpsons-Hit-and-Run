@@ -348,7 +348,7 @@ void rDebugString_Implementation( const char * pString )
 //
 // Notes:
 //------------------------------------------------------------------------------
-#if defined( RAD_RELEASE )
+#if defined( RAD_RELEASE ) && !defined( __EMSCRIPTEN__ )
 bool g_AllowDebugOutput = false;
 #else
 bool g_AllowDebugOutput = true;
