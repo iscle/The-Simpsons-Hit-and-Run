@@ -1,5 +1,10 @@
 # Browser / WebAssembly build (Emscripten)
 
+▶ **Playable build:** https://iscle.github.io/the-simpsons-hit-and-run-wasm/
+(prebuilt engine, hosted on GitHub Pages —
+[repo](https://github.com/iscle/the-simpsons-hit-and-run-wasm)). You supply your
+own game data via `?assets=<url>`; see that repo's README.
+
 This port can be compiled to WebAssembly and run in a browser using
 [Emscripten](https://emscripten.org/). The browser build uses the GLES2
 renderer (WebGL), Emscripten's SDL2 and libpng ports, its built-in OpenAL
